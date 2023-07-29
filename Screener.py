@@ -178,7 +178,8 @@ class Screener:
 				container.append([ticker, date, tf , path])
 			
 		num_packages = length // 10000
-		if num_packages < 5: num_packages = 5
+		min_packages = data.get_nodes()
+		if num_packages < min_packages: num_packages = min_packages
 		ii = 0
 		package = []
 		for _ in range(num_packages):
@@ -223,7 +224,7 @@ class Screener:
 			for ticker, z, df in setups:
 				Screener.log(ticker,z,df,tf,path,setup_type)
   
-	def requirements(df,currentday,path,ticker):
+	def get_requirements(df,currentday,path,ticker):
 		length = len(df)
 		if length < 5:
 			return 0,0,0
@@ -273,9 +274,8 @@ class Screener:
 			try: setups = pd.read_feather(d)
 			except: setups = pd.DataFrame()
 			add =pd.DataFrame({'ticker': [ticker],
-					'date':[df.index[-1]],
-					'setup': [st],
-					'tf': [tf],
+					'datetime':[df.index[-1]],
+					'setup': [setup_type],
 					'z':[z]})
 			setups = pd.concat([setups,add]).reset_index(drop = True)
 			setups.to_feather(d)
@@ -283,12 +283,13 @@ class Screener:
 			d = "C:/Screener/tmp/subsetups/" + str(os.getpid()) + ".feather"
 			try: setups = pd.read_feather(d)
 			except: setups = pd.DataFrame()
-			add = pd.DataFrame({'Date': [df.index[-1]],
-						'ticker':[ticker],
-						'setup': [st],
-						'tf': [z],
-						'z': [tf],
-						'annotation': [""]
+			add = pd.DataFrame({'ticker':[ticker],
+						'datetime': [df.index[-1]],
+						'setup': [setup_type],
+						'z': [z],
+						'sub_setup':[setup_type],
+						'pre_annotation': [""],
+						'post_annotation': [""]
 						})
 			setups = pd.concat([setups,add]) .reset_index(drop = True)
 			setups.to_feather(d)

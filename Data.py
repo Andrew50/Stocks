@@ -3,6 +3,9 @@
 #remove all premarket from saved df
 
 
+#screen for histrocial setups every night if unmarked less than 500 or something
+
+
 import numpy as np
 from typing import Tuple
 from matplotlib import pyplot as plt
@@ -28,6 +31,64 @@ warnings.filterwarnings("ignore")
 
 class Data:
 
+
+
+	def add_setup(ticker,date,setup):
+		if event == 'Yes' or event == 'No' and not data.isTae():
+                    date = (self.setups_data.iloc[int(self.i)][0])
+                    ticker = self.setups_data.iloc[int(self.i)][1]
+                    s = self.setups_data.iloc[int(self.i)][2]
+                    if event == 'Yes':
+                        val = 1
+                        print(f'added {ticker}')
+                    else:
+                        val = 0
+                        print(f'removed {ticker}')
+                    df2 = pd.DataFrame({
+
+
+                    'date':[date],
+                    'ticker':[ticker],
+                    'setup':[val],
+                    'req':[1]
+                    
+                    })
+
+                    if(data.isBen()):
+                        try:
+                            df = pd.read_feather('C:/Screener/sync/database/ben_' + s + '.feather')
+                        except:
+                            df = pd.DataFrame()
+                    elif data.isLaptop():
+                        try:
+                            df = pd.read_feather('C:/Screener/sync/database/laptop_' + s + '.feather')
+                        except:
+                            df = pd.DataFrame()
+                    else:
+                        try:
+                            df = pd.read_feather('C:/Screener/sync/database/aj_' + s + '.feather')
+                        except:
+                            df = pd.DataFrame()
+
+                    df = pd.concat([df,df2]).reset_index(drop = True)
+                    
+                    if(data.isBen()):
+                        df.to_feather('C:/Screener/sync/database/ben_' + s + '.feather')
+                    elif data.isLaptop():
+                        df.to_feather('C:/Screener/sync/database/laptop_' + s + '.feather')
+                
+                    else:
+                        df.to_feather('C:/Screener/sync/database/aj_' + s + '.feather')
+
+
+
+
+
+
+
+
+
+
 	def is_market_open():
 		dayOfWeek = datetime.datetime.now().weekday()
 		if(dayOfWeek == 5 or dayOfWeek == 6): return 0
@@ -47,10 +108,13 @@ class Data:
 		if os.path.exists("C:/Stocks/local/data/tae.txt"): return 'tae'
 		raise Exception('No idetifcation file')
 
+	def get_nodes():
+		if Data.ideentify == 'laptop':
+			return 8
+		return 5
+
 	def pool(deff,arg):
-		if Data.identify() == 'laptop': nodes = 8
-		else: nodes = 5
-		pool = Pool(processes = nodes)
+		pool = Pool(processes = Data.get_nodes())
 		data = list(tqdm(pool.imap(deff, arg), total=len(arg))) #might need to be imap
 		return data
 
@@ -93,7 +157,7 @@ class Data:
 		else: path = '1min/'
 		return drive + path + ticker + '.feather'
 	
-	def get(ticker = 'QQQ',tf = 'd',dt = None, bars = 0):
+	def get(ticker = 'QQQ',tf = 'd',dt = None, bars = 0, offset = 0):
 
 		def adjust_date(dt,tf):
 			if 'd' in tf or 'w' in tf: tf  = 'd'
@@ -136,7 +200,7 @@ class Data:
 					index = Data.findex(df,adj_dt)
 			except:
 				return pd.DataFrame()
-			df = df[:index + 1]
+			df = df[:index + 1 + offset]
 			if dt.hour < 5 or (dt.hour == 5 and dt.minute < 30):  ####if date requested is premarket
 				if 'd' in tf or 'w' in tf:
 					df = append_tv(ticker,tf,df,True)
@@ -244,9 +308,9 @@ class Data:
 
 		dir_list = os.listdir(path)
 		try:
-			setups = pd.read_feather(r"C:\Screener\sync\setups.feather")
+			historical_setups = pd.read_feather(r"C:\Stocks\local\study\histrocial_setups.feather")
 		except:
-			setups = pd.DataFrame()
+			historical_setups = pd.DataFrame()
 		todays_setups = pd.DataFrame()
 		if len(dir_list) > 0:
 			for f in dir_list:
@@ -256,12 +320,12 @@ class Data:
 				else:
 					df = pd.read_feather(path + f)
 					setups = pd.concat([setups,df])
-			if not setups.empty:
-				setups.reset_index(inplace = True,drop = True)
-				setups.to_feather(r"C:\Screener\sync\setups.feather")
+			if not historical_setups.empty:
+				historical_setups.reset_index(inplace = True,drop = True)
+				historical_setups.to_feather(r"C:\Stocks\local\study\historical_setups.feather")
 			if not todays_setups.empty:
 				todays_setups.reset_index(inplace = True,drop = True)
-				todays_setups.to_feather(r"C:\Screener\sync\todays_setups.feather")
+				todays_setups.to_feather(r"C:\Stocks\local\study\current_setups.feather")
 		if os.path.exists(path):
 			shutil.rmtree(path)
 		os.mkdir(path)
@@ -361,7 +425,7 @@ class Data:
 		if len(df) < sample_size + 1:
 			add = pd.DataFrame(df.iat[-1,3], index=np.arange(sample_size - len(df) + 1), columns=df.columns)
 			df = pd.concat([add,df])
-		df = get_lagged_returns(df, sample_size - 1)
+		df = get_lagged_returns(df, sample_size)
 			
 		df = get_classification(df,value)
 		df = df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification']]
@@ -387,8 +451,8 @@ class Data:
 		if pool: dfs = Data.pool(Data.worker,arglist)
 		else: dfs = [Data.worker(arglist[i]) for i in range(len(arglist))]
 		values = pd.concat(dfs).values
-		y = values[:, -1]
-		x = reshape_x(values[:, :-1],Data.setup_size(setup_type))
+		y = values[:,-1]
+		x = reshape_x(values[:,:-1],Data.setup_size(setup_type))
 		return x , y
 	
 	def setup_size(setup_type):
