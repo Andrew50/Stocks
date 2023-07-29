@@ -17,110 +17,6 @@ from tensorflow.keras.models import load_model
 
 class Screener:
 
-	def screen(container):
-
-		setuplist = ['d_EP','d_NEP','d_P', 'd_F', 'd_MR', 'd_NP','d_NF']
-		threshold = .25
-
-		model_list = []
-		for setup in setuplist:
-			if tf in setup:
-				model = load_model('C:/Screener/sync/models/model_' + str(setup))
-				model_list.append([model, str(setup)])
-		pbar = tqdm(total=len(container))
-		dfs = []
-		for bar in container:
-			pbar.update(1)
-			ticker = bar[0]
-			tf = bar[1]
-			path = bar[2]
-			date_list = bar[3]
-			date = date_list[0]
-			df = data.get(ticker,tf,date)
-			df['ticker'] = ticker
-			for date in date_list:
-				index = data.findex(df,date)
-				dolVol, adr, pmDolVol = Screener.requirements(df,index,path,ticker)
-				if (dolVol > 8000000 or pmDolVol  > .5 * 1000000) and adr > 2.8 and tf == 'd':
-					dfs.append(df[:index + 1])
-		for bar in model_list:
-			model = bar[0]
-			setup_type = bar[1]
-			idk = data.score(dfs,setup_type,model,threshold)
-  
-	def requirements(df,currentday,path,ticker):
-		dol_vol_l = 5
-		adr_l = 15
-		if(currentday == None): 
-			return 0, 0
-		dolVol = []
-		for i in range(dol_vol_l):
-			dolVol.append(df.iat[currentday-1-i,3]*df.iat[currentday-1-i,4])
-		dolVol = statistics.mean(dolVol)              
-		adr= []
-		for j in range(adr_l): 
-			high = df.iat[currentday-j-1,1]
-			low = df.iat[currentday-j-1,2]
-			val = (high/low - 1) * 100
-			adr.append(val)
-		adr = statistics.mean(adr)  
-		if path == 1 and dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
-			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
-			pmprice = df.iat[currentday,0]
-			pmDolVol = pmvol * pmprice
-		else:
-			pmDolVol = 0
-		return dolVol, adr, pmDolVol
-
-	def log(df,currentday, tf, ticker, z, path, st):
-		if path == 2:
-			mc = mpf.make_marketcolors(up='g',down='r')
-			s  = mpf.make_mpf_style(marketcolors=mc)
-			ourpath = pathlib.Path("C:/Screener/tmp")/ 'test.png'
-			df = df[-100:]
-			#df.set_index('datetime', inplace = True)
-			mpf.plot(df, type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {st}, {z}, {tf}', style=s, savefig=ourpath)
-			discordintraday = Discord(url="https://discord.com/api/webhooks/1071667193709858847/qwHcqShmotkEPkml8BSMTTnSp38xL1-bw9ESFRhBe5jPB9o5wcE9oikfAbt-EKEt7d3c")
-
-			discordintraday.post(file={"test": open('tmp/test.png', "rb")})
-		elif path == 1:
-			d = "C:/Screener/tmp/subsetups/today" + str(os.getpid()) + ".feather"
-			try: setups = pd.read_feather(d)
-			except: setups = pd.DataFrame()
-			add =pd.DataFrame({'ticker': [ticker],
-					'date':[df.index[currentday]],
-					'setup': [st],
-					'tf': [tf],
-					'z':[z]})
-			setups = pd.concat([setups,add]).reset_index(drop = True)
-			setups.to_feather(d)
-		elif path == 0:
-			d = "C:/Screener/tmp/subsetups/" + str(os.getpid()) + ".feather"
-			try: setups = pd.read_feather(d)
-			except: setups = pd.DataFrame()
-			add = pd.DataFrame({'Date': [df.index[currentday]],
-						'ticker':[ticker],
-						'setup': [st],
-						'tf': [z],
-						'z': [tf],
-						'annotation': [""]
-						})
-			setups = pd.concat([setups,add]) .reset_index(drop = True)
-			setups.to_feather(d)
-				
-	def isToday(dt):
-		if dt == None:
-			return False
-		if dt == 'Today' or dt == '0' or dt == 0:
-			return True
-		time = datetime.time(0,0,0)
-		today = datetime.date.today()
-		today = datetime.datetime.combine(today,time)
-		dt = Scan.convert_date(dt)
-		if dt >= today:
-			return True
-		return False
-
 	def get(type = 'full',  refresh = False, browser = None):
 
 		def start_firefox():
@@ -142,8 +38,8 @@ class Screener:
 			time.sleep(1)
 			browser.find_element(By.XPATH, '//button[@data-name="header-user-menu-sign-in"]').click()
 			time.sleep(1)
-			browser.find_element(By.XPATH, '//button[@class="emailButton-nKAw8Hvt light-button-bYDQcOkp with-start-icon-bYDQcOkp variant-secondary-bYDQcOkp color-gray-bYDQcOkp size-medium-bYDQcOkp typography-medium16px-bYDQcOkp"]').click()
-			username = browser.find_element(By.XPATH, '//input[@name="id_username"]').send_keys("cs.benliu@gmail.com")
+			browser.find_element(By.XPATH, '//button[@class="emailButton-nKAw8Hvt light-button-bYDQcOkp with-start-icon-bYDQcOkp variant-secondary-bYDQcOkp color-gray-bYDQcOkp size-medium-bYDQcOkp typography-regular16px-bYDQcOkp"]').click()
+			browser.find_element(By.XPATH, '//input[@name="id_username"]').send_keys("cs.benliu@gmail.com")
 			time.sleep(0.5)
 			password = browser.find_element(By.XPATH, '//input[@name="id_password"]').send_keys("tltShort!1")
 			time.sleep(0.5)
@@ -168,7 +64,7 @@ class Screener:
 			return browser
 
 		def get_full(refresh):
-			df1 = pd.read_feather("C:/Screener/sync/full_scan.feather")
+			df1 = pd.read_feather("C:/Stocks/sync/full_scan.feather")
 			if not data.indentify() == 'desktop' or not refresh: return df1.set_index('Ticker')
 			df2 = pd.read_feather("C:/Screener/sync/current_scan.feather")
 			df3 = pd.concat([df1,df2]).drop_duplicates(subset = ['Ticker'])		
@@ -191,7 +87,8 @@ class Screener:
 
 		def get_current(refresh,browser = None):
 			if not refresh:
-				return pd.read_feather("C:/Screener/sync/current_scan.feather")
+				try: return pd.read_feather("C:/Stocks/sync/files/current_scan.feather").set_index('Ticker')
+				except FileNotFoundError: pass
 			today = str(datetime.date.today())
 			try:
 				if(browser == None):
@@ -203,7 +100,7 @@ class Screener:
 				time.sleep(0.25)
 				browser.find_element(By.XPATH, '//div[@data-field="relative_volume_intraday.5"]').click()
 				browser.find_element(By.XPATH, '//div[@data-name="screener-export-data"]').click()
-			except Exception as e:
+			except TimeoutError as e:
 				print(e)
 				print('manual csv fetch required')
 			found = False
@@ -250,7 +147,7 @@ class Screener:
 			
 	def run(date = None,days = 1, ticker = None, tf = 'd',browser = None, fpath = None):
 		path = 0
-		data.consolidate_training_data()
+		data.consolidate_setups()
 		if ticker == None:
 			ticker_list = Screener.get('full').index.tolist()
 		elif type(ticker) is str:
@@ -274,14 +171,12 @@ class Screener:
 		if fpath != None:
 			path = fpath
 		length = len(ticker_list)*len(date_list)
-		pbar = tqdm(total=length)
 		container = []
-		for i in  range(len( ticker_list)):
-			ticker = ticker_list[i]
-			container.append([ticker, tf , path, []])
+		print(f'{length} items')
+		for ticker in ticker_list:
 			for date in date_list:
-				container[i][3].append(date)
-				pbar.update(1)
+				container.append([ticker, date, tf , path])
+			
 		num_packages = length // 10000
 		if num_packages < 5: num_packages = 5
 		ii = 0
@@ -293,17 +188,125 @@ class Screener:
 			ii += 1
 			if ii == num_packages:
 				ii = 0
-		data.pool(Screener.screen, package)
-		data.Consolidate_setups()
+		if length == 1:
+			Screener.screen(package[0])
+		else:
+			data.pool(Screener.screen, package)
+		data.consolidate_setups()
+
+	def screen(container):
+		#setuplist = ['d_EP','d_NEP','d_P', 'd_F', 'd_MR', 'd_NP','d_NF']
+		setuplist = ['d_EP']
+		threshold = .25
+		model_list = []
+		tf = container[0][2]
+		for setup in setuplist:
+			if tf in setup:
+				model = load_model('C:/Stocks/sync/models/model_' + str(setup))
+				model_list.append([model, str(setup)])
+		dfs = []
+		tickers = []
+		for bar in container:
+			ticker = bar[0]
+			date = bar[1]
+			tf = bar[2]
+			path = bar[3]
+			df = data.get(ticker,tf,date,200)
+			dolVol, adr, pmDolVol = Screener.requirements(df,-1,path,ticker)
+			if ((dolVol > 8000000 or pmDolVol  > .5 * 1000000) and adr > 2.8 and tf == 'd'):
+				dfs.append(df)
+				tickers.append(ticker)
+		for bar in model_list:
+			model = bar[0]
+			setup_type = bar[1]
+			setups = data.score(dfs,tickers,setup_type,model,threshold)
+			for ticker, z, df in setups:
+				Screener.log(ticker,z,df,tf,path,setup_type)
+  
+	def requirements(df,currentday,path,ticker):
+		length = len(df)
+		if length < 5:
+			return 0,0,0
+		if path == 3:
+			return 1000000 , 100000 , 1000000
+		dol_vol_l = 15
+		adr_l = 15
+		if dol_vol_l > length:
+			dol_vol_l = length - 1
+		if adr_l > length:
+			adr_l = length - 1
+		dolVol = []
+		for i in range(dol_vol_l):
+			dolVol.append(df.iat[currentday-1-i,3]*df.iat[currentday-1-i,4])
+		dolVol = statistics.mean(dolVol)              
+		adr= []
+		for j in range(adr_l): 
+			high = df.iat[currentday-j-1,1]
+			low = df.iat[currentday-j-1,2]
+			val = (high/low - 1) * 100
+			adr.append(val)
+		adr = statistics.mean(adr)  
+		if path == 1 and dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
+			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
+			pmprice = df.iat[currentday,0]
+			pmDolVol = pmvol * pmprice
+		else:
+			pmDolVol = 0
+		return dolVol, adr, pmDolVol
+
+	def log(ticker,z, df, tf,  path, setup_type):
+		z = round(z * 100)
+		if path == 3:
+			print(f'{ticker} {df.index[-1]} {z} {setup_type} ')
+		elif path == 2:
+			mc = mpf.make_marketcolors(up='g',down='r')
+			s  = mpf.make_mpf_style(marketcolors=mc)
+			ourpath = pathlib.Path("C:/Screener/tmp")/ 'test.png'
+			df = df[-100:]
+			#df.set_index('datetime', inplace = True)
+			mpf.plot(df, type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {st}, {z}, {tf}', style=s, savefig=ourpath)
+			discordintraday = Discord(url="https://discord.com/api/webhooks/1071667193709858847/qwHcqShmotkEPkml8BSMTTnSp38xL1-bw9ESFRhBe5jPB9o5wcE9oikfAbt-EKEt7d3c")
+
+			discordintraday.post(file={"test": open('tmp/test.png', "rb")})
+		elif path == 1:
+			d = "C:/Screener/tmp/subsetups/today" + str(os.getpid()) + ".feather"
+			try: setups = pd.read_feather(d)
+			except: setups = pd.DataFrame()
+			add =pd.DataFrame({'ticker': [ticker],
+					'date':[df.index[-1]],
+					'setup': [st],
+					'tf': [tf],
+					'z':[z]})
+			setups = pd.concat([setups,add]).reset_index(drop = True)
+			setups.to_feather(d)
+		elif path == 0:
+			d = "C:/Screener/tmp/subsetups/" + str(os.getpid()) + ".feather"
+			try: setups = pd.read_feather(d)
+			except: setups = pd.DataFrame()
+			add = pd.DataFrame({'Date': [df.index[-1]],
+						'ticker':[ticker],
+						'setup': [st],
+						'tf': [z],
+						'z': [tf],
+						'annotation': [""]
+						})
+			setups = pd.concat([setups,add]) .reset_index(drop = True)
+			setups.to_feather(d)
+		
 
 if __name__ == '__main__':
-	if   ((datetime.datetime.now().hour) < 5 or (datetime.datetime.now().hour == 5 and datetime.datetime.now().minute < 40)) or not os.path.exists("C:/Screener/laptop.txt"):
+	
+	if   ((datetime.datetime.now().hour) < 5 or (datetime.datetime.now().hour == 5 and datetime.datetime.now().minute < 40)) and not data.identify == 'laptop':
 		Screener.run('0')
 		study.current(study,True)
 		browser = Screener.get.startFirefoxSession()
 		while datetime.datetime.now().hour < 13:
 			Screener.run(tf = '1min', date = '0',browser = browser)
 	else:
+		Screener.run(ticker = ['ENPH'],fpath = 3)
+
+
+
 		i = 0
 		path = "C:/Screener/tmp/subtickerlists/"
 		while True:

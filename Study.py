@@ -2,27 +2,20 @@
 
 import PySimpleGUI as sg
 import os 
-import numpy
 import pandas as pd
 import pathlib
 import mplfinance as mpf
 import math
 from PIL import Image
-import matplotlib
 from matplotlib import pyplot as plt
-import io
 import datetime
 import matplotlib.ticker as mticker
-
-from Data7 import Data as data
-import time as ttime
+from Data import Data as data
 import shutil
-from time import sleep
 from multiprocessing.pool import Pool
-import statistics
+    
 
-
-class UI:
+class Study:
 
     def loop(self,current = False):
    
@@ -243,14 +236,8 @@ class UI:
     def lookup(self,ticker,date,setup,keyword,sortinput,timeframe):
 
         if self.historical:
-        
-            print(f'searching for "{keyword}"')
-        
             scan = pd.read_feather(r"C:\Screener\sync\setups.feather")
 
-            if timeframe  != "":
-                scan = scan[scan['timeframe'] == timeframe]
-            
             if ticker  != "":
                 scan = scan[scan["Ticker"] == ticker]
 
@@ -276,38 +263,8 @@ class UI:
             else:
                 scan = scan[scan['annotation'] == "" ]
             
-            if sortinput != "":
-             
-                idex = 0
-                if sortinput == 'z':
-                    idex = 'Z'
-                if sortinput == 'gap':
-                    idex = 'gap'
-                if sortinput == 'adr':
-                    idex = 'adr'
-                if sortinput == 'vol':
-                    idex = 'vol'
-                if sortinput == '1':
-                    idex = '1'
-                if sortinput == '2':
-                    idex = '2'
-                if sortinput == '3':
-                    idex = '3'
-                if sortinput == '10':
-                    idex = '10'
-                if sortinput == 'time':
-                    idex = 'time'
-
-                if idex != 0:
-
-                    scan = scan.sort_values(by=[idex], ascending=False)
-
-                else:
-                    sg.Popup('Not A Trait')
-
-            else:
-                #scan = scan.sample(frac=1)
-                scan = scan.sort_values(by=['Z'], ascending=False)
+            
+            scan = scan.sort_values(by=['Z'], ascending=False)
 
         else:
             scan = pd.read_feather(r"C:\Screener\sync\todays_setups.feather").sort_values(by=['Z'], ascending=False)
