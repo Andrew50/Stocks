@@ -26,9 +26,56 @@ from imbox import Imbox
 class 
 
 
-class Run(self): 
+class Run: 
+    def run(self):
+        with Pool(6) as self.pool:
+            if os.path.exists("C:/Screener/tmp/pnl/charts"):
+                shutil.rmtree("C:/Screener/tmp/pnl/charts")
+            os.mkdir("C:/Screener/tmp/pnl/charts")
+            self.preloadamount = 7
+            self.i = 0
+            self.menu = None
+            self.event = [None]
+            self.index = None
+            self.update(self)
+            while True:
+                self.event, self.values = self.window.read(timeout=15000)
+                if self.event == "Traits" or self.event == "Plot" or self.event == "Account" or self.event == "Log":
+                    self.index = None
+                    self.menu = self.event
+                    self.update(self)
+                elif self.event != '__TIMEOUT__':
+                    if self.menu == "Traits":
 
-class Account():
+                        traits.traits(self)
+                    elif self.menu == "Plot":
+                        plot.plot(self)
+                    elif self.menu == "Account":
+                        account.account(self)
+                    elif self.menu == "Log":
+                        log.log(self)
+                else:
+                  
+                    if self.menu == "Account": #and (data.isMarketOpen()):
+                        print('refresh')
+                        self.df_pnl = pd.read_feather(r"C:\Screener\sync\pnl.feather").set_index('datetime',drop = True)
+                        account.plot_update(self)
+                        pool = self.pool
+                        tf = self.values['input-timeframe']
+                        bars = self.values['input-bars']
+                        if tf == '':
+                            tf = 'd'
+                        if bars == '':
+                            bars = '375'
+                        pool.apply_async(account.calcaccount,args = (self.df_pnl,self.df_log,'now',tf,bars,self.account_type, self.df_traits), callback = account.account_plot)
+
+
+
+
+class Account(object):
+
+
+
 
     def account(self):
         
@@ -159,48 +206,7 @@ class Account():
         self.window.maximize()
 
     def loop(self):
-        with Pool(6) as self.pool:
-            if os.path.exists("C:/Screener/tmp/pnl/charts"):
-                shutil.rmtree("C:/Screener/tmp/pnl/charts")
-            os.mkdir("C:/Screener/tmp/pnl/charts")
-            self.preloadamount = 7
-            self.i = 0
-            self.menu = None
-            self.event = [None]
-            self.index = None
-            self.update(self)
-            self.account_type = 'Real'
-            lap = datetime.datetime.now()
-            while True:
-                self.event, self.values = self.window.read(timeout=15000)
-                if self.event == "Traits" or self.event == "Plot" or self.event == "Account" or self.event == "Log":
-                    self.index = None
-                    self.menu = self.event
-                    self.update(self)
-                elif self.event != '__TIMEOUT__':
-                    if self.menu == "Traits":
-
-                        traits.traits(self)
-                    elif self.menu == "Plot":
-                        plot.plot(self)
-                    elif self.menu == "Account":
-                        account.account(self)
-                    elif self.menu == "Log":
-                        log.log(self)
-                else:
-                  
-                    if self.menu == "Account": #and (data.isMarketOpen()):
-                        print('refresh')
-                        self.df_pnl = pd.read_feather(r"C:\Screener\sync\pnl.feather").set_index('datetime',drop = True)
-                        account.plot_update(self)
-                        pool = self.pool
-                        tf = self.values['input-timeframe']
-                        bars = self.values['input-bars']
-                        if tf == '':
-                            tf = 'd'
-                        if bars == '':
-                            bars = '375'
-                        pool.apply_async(account.calcaccount,args = (self.df_pnl,self.df_log,'now',tf,bars,self.account_type, self.df_traits), callback = account.account_plot)
+        
     def pull_mail():
 
         host = "imap.gmail.com"
@@ -1492,3 +1498,8 @@ class Account():
             except:
                 pass
       
+
+
+
+if __name__ == '__main__':
+    Run.run(Run)
