@@ -1,5 +1,6 @@
 
-
+#automatically add typed in custom sub setup to sub setup list
+#retype
 import PySimpleGUI as sg
 import os 
 import pandas as pd
@@ -7,8 +8,8 @@ import pathlib
 import mplfinance as mpf
 import math
 from PIL import Image
+import PIL
 from matplotlib import pyplot as plt
-import datetime
 import matplotlib.ticker as mticker
 import io
 from Data import Data as data
@@ -18,16 +19,22 @@ from multiprocessing.pool import Pool
 
 class Study:
 
-    def __init__(self,name):
-        self.preload_amount = 10
-
     def run(self,current = False):
-        self.current = current
-        self.init = True
-        self.previ = None
+        self.preload_amount = 10
+        self.sub_setups_list = {
+            'd_EP':['true EP','range EP','low EP','volume EP','other EP'],
+            'd_NEP':['backside NEP','range NEP','pivot NEP','high NEP', 'other NEP'],
+            'd_F':['bull F','breakdown F','other F'],
+            'd_NF':['bear F','breakout NF''other F'],
+            'd_MR':['nep MR','straight MR','parabolic MR','extended MR','other MR'],
+            'd_PS':['microcap PS','largecap PS','other PS'],
+            'd_P':['strong P','weak P','range P','pocket P','other P'],
+            'd_NP':['strong NP','weak NP','range NP','other P']}
         with Pool(data.get_nodes()) as self.pool:
+            self.current = current
+            self.init = True
+            self.previ = None
             self.lookup(self)
-            self.update(self,True,None,0)
             while True:
                 self.event, self.values = self.window.read()
                 if self.event == 'Yes' or self.event == 'No':
@@ -62,37 +69,44 @@ class Study:
         self.pool.map_async(self.plot,arglist)
         
     def lookup(self):
-        if self.historical:
-            scan = pd.read_feather(r"C:\Stocks\local\study\setups.feather")
-            sort = self.values('-input_sort-')
-            reqs = sort.split('&')
-            sort = None
-            for req in reqs:
-                if '^' in req:
-                    sort = req[1:]
-                else:
-                    req = req.split('|')
-                    dfs = []
-                    for r in req:
-                        r = r.split('=')
-                        trait = r[0]
-                        val = r[1]
-                        if trait == 'annotation':
-                            df = scan[scan[trait].str.contrains(val)]
+        try:
+            if self.current:
+                scan = pd.read_feather(r"C:\Screener\local\study\todays_setups.feather").sort_values(by=['z'], ascending=False)
+            else:
+                scan = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+                sort_val = None
+                if not self.init:
+                    sort = self.values['-input_sort-']
+                    reqs = sort.split('&')
+                    for req in reqs:
+                        if '^' in req:
+                            sort_val = req.split('^')[1]
+                            if sort_val not in scan.columns:
+                                raise TimeoutError
                         else:
-                            df = scan[scan[trait] == val]
-                        dfs.append(df)
-                    scan = pd.concat(dfs).drop_duplicates()
-            if sort != None:
-                scan = scan.sort_values(by = [sort], ascending = False)
-        else:
-            scan = pd.read_feather(r"C:\Screener\local\study\todays_setups.feather").sort_values(by=['z'], ascending=False)
-        if scan.empty:
+                            req = req.split('|')
+                            dfs = []
+                            for r in req:
+                                r = r.split('=')
+                                trait = r[0]
+                                if trait not in scan.columns or len(r) == 1:
+                                    raise TimeoutError
+                                val = r[1]
+                                if trait == 'annotation':
+                                    df = scan[scan[trait].str.contrains(val)]
+                                else:
+                                    df = scan[scan[trait] == val]
+                                dfs.append(df)
+                            scan = pd.concat(dfs).drop_duplicates()
+                if sort_val != None: scan = scan.sort_values(by = [sort_val], ascending = False)
+                else:scan = scan.sample(frac = 1)
+            if scan.empty:
+                raise TimeoutError
+        except TimeoutError:
             sg.Popup('no setups found')
         else:
             self.setups_data = scan
             self.i = 0.0
-            self.init = True
             if os.path.exists("C:/Stocks/local/study/charts"):
                 while True:
                     try:
@@ -107,17 +121,14 @@ class Study:
     def plot(bar):
         setups_data = bar[0]
         i = bar[1]
+        if int(i) != i: revealed = True
+        else: revealed = False
         current = bar[2]
-        date = (setups_data.iloc[i][1])
-        ticker = setups_data.iloc[i][0]
-        setup = setups_data.iloc[i][2]
-        z= setups_data.iloc[i][3]
+        date = (setups_data.iloc[math.floor(i)][1])
+        ticker = setups_data.iloc[math.floor(i)][0]
+        setup = setups_data.iloc[math.floor(i)][2]
+        z= setups_data.iloc[math.floor(i)][3]
         tf= setup.split('_')[0]
-        if int(i) != i:
-            revealed = True
-        elif current == True:
-            return #if its current then no need to create unrevealed charts as they wont be used
-        i = math.floor(i)
         tf_list = []
         if 'w' in tf or 'd' in tf or 'h' in tf:
             intraday = False
@@ -137,7 +148,10 @@ class Study:
                 fh = 18
                 dpi = 330
             else:
-                raise Exception('undefined figure scales')
+                fs = .49
+                fw = 41
+                fh = 18
+                dpi = 330
         elif ident == 'desktop':
             if current:
                 fs = 1.08
@@ -162,18 +176,23 @@ class Study:
         mc = mpf.make_marketcolors(up='g',down='r')
         s  = mpf.make_mpf_style(marketcolors=mc)
         ii = len(tf_list)
+        first_minute_high = 1
+        first_minute_low = 1
+        first_minute_close = 1
+        first_minute_volume = 0
         for tf in tf_list:
-            ii -= 1
-            p4 = pathlib.Path("C:/Screener/tmp/charts") / f'{ii}{i}.png'
+           
+            p = pathlib.Path("C:/Stocks/local/study/charts") / f'{ii}{i}.png'
             try:
-                chart_size = 150
+                chart_size = 100
                 if 'min' in tf:
                     chart_offset = chart_size - 1
                 else:
-                    chart_offset = 30
+                    chart_offset = 20
                 if not revealed: chart_offset = 0
                 df = data.get(ticker,tf,date,chart_size,chart_offset)
-                
+                if df.empty:
+                    raise TimeoutError
                 if not revealed and not intraday:
                     if tf == '1min':
                         open = df.iat[-1,0]
@@ -187,141 +206,67 @@ class Study:
                         df.iat[-1,2] = open * first_minute_low
                         df.iat[-1,3] = open * first_minute_close
                         df.iat[-1,4] = first_minute_volume
+                if (current or revealed) and ii == 1: title = f'{ticker} {setup} {z} {tf}' 
+                else: title = str(tf)
                 if revealed:
-                    _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[d4], alpha = .25))
+                    _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[date], alpha = .25))
                 else:
-                    _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
+                    _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
                 ax = axlist[0]
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
-                plt.savefig(p4, bbox_inches='tight',dpi = dpi)
+                plt.savefig(p, bbox_inches='tight',dpi = dpi)
             except TimeoutError:
-                shutil.copy(r"C:\Screener\tmp\blank.png",p4)
-        
+                shutil.copy(r"C:\Stocks\sync\files\blank.png",p)
+            ii -= 1
+
     def update(self):
-        image1 = None
-        image2 = None
-        image3 = None
-        image4 = None
-
-        gosh = 1
-        start = datetime.datetime.now()
-        while True:
-            if (datetime.datetime.now() - start).seconds < gosh or init:
-                if image1 == None:
-                    try:
-                        image1 = Image.open(r"C:\Screener\tmp\charts\1" + str(self.i) + ".png")
-                    except:
-                        pass
-                if image2 == None:
-                    try:
-                        image2 = Image.open(r"C:\Screener\tmp\charts\2" + str(self.i) + ".png")
-                    except :
-                        pass
-                if image3 == None:
-                    try:
-                        image3 = Image.open(r"C:\Screener\tmp\charts\3" + str(self.i) + ".png")
-                    except:
-                        pass
-                if image4 == None:
-                    try:
-                        image4 = Image.open(r"C:\Screener\tmp\charts\4" + str(self.i) + ".png")
-                    except:
-                        pass
-
-                if image1 != None and image2 != None and image3 != None and image4 != None:
-                    break
-            else:
-                self.preload(self,self.i)
-                start = datetime.datetime.now()
-                print('reloading image')
-                gosh = 10
-        
-        bio1 = io.BytesIO()
-
-        image1.save(bio1, format="PNG")
-        bio2 = io.BytesIO()
-        image2.save(bio2, format="PNG")
-        bio3 = io.BytesIO()
-        image3.save(bio3, format="PNG")
-        bio4 = io.BytesIO()
-        image4.save(bio4, format="PNG")
-        
-
-
-
         if self.init:
             sg.theme('DarkGrey')
             if data.identify() == 'tae': scale = 1.1
             else: scale = 2.5
             layout = [  
-            [sg.Image(bio1.getvalue(),key = '-IMAGE-'),sg.Image(bio2.getvalue(),key = '-IMAGE2-')],
-            [sg.Image(bio3.getvalue(),key = '-IMAGE3-'),sg.Image(bio4.getvalue(),key = '-IMAGE4-')],
+            [sg.Image(key = '-IMAGE1-'),sg.Image(key = '-IMAGE2-')],
+            [sg.Image(key = '-IMAGE3-'),sg.Image(key = '-IMAGE4-')],
             [(sg.Text( key = '-number-'))]]
             if self.current:
                 layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
             else:
                 layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],
-                [sg.InputText(key = '-input_sort-')],
+                [sg.Combo([],key = '-sub_setup-', size = (20,10)),sg.InputText(key = '-input_sort-')],
                 [sg.Button('Prev'), sg.Button('Next'),sg.Button('Load')]]
-                self.window = sg.Window('Study', layout,margins = (10,10),finalize = True)
-            self.window["-IMAGE-"].update(data=bio1.getvalue())
-            self.window["-IMAGE2-"].update(data=bio2.getvalue())
-            self.window["-IMAGE3-"].update(data=bio3.getvalue())
-            self.window["-IMAGE4-"].update(data=bio4.getvalue())
-            self.window['-number-'].update(str(f"{round(self.i + 1)} of {len(self.setups_data)}"))
-            if not self.current:
-                if self.previ != None:
-                df = pd.read_feather(r"C:\Stocks\local\study\setups.feather")
+            self.window = sg.Window('Study', layout,margins = (10,10),finalize = True)
+            self.init = False
+        for i in range(1,5):
+            while True:
+                try: 
+                    image = Image.open(f'C:\Stocks\local\study\charts\{i}{self.i}.png')
+                    bio = io.BytesIO()
+                    image.save(bio, format="PNG")
+                    self.window[f'-IMAGE{i}-'].update(data = bio.getvalue())
+                except (PIL.UnidentifiedImageError, FileNotFoundError, OSError): pass
+                else: break
+        self.window['-number-'].update(str(f"{math.floor(self.i + 1)} of {len(self.setups_data)}"))
+        if not self.current:
+            if self.previ != None:
+                df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
                 annotation = self.values["-annotation-"]
-                
+                sub_setup = self.values['-sub_setup-']
                 if int(self.previ) == self.previ: col = 'pre_annotation'
                 else: col = 'post_annotation'
-                previ = math.floor(previ)
-                index = self.setups_data.index[math.floor(previ)]
+                index = self.setups_data.index[math.floor(self.previ)]
                 self.setups_data.at[index, col] = annotation
                 df.at[index, col] = annotation
+                self.setups_data.at[index,'sub_setup'] = sub_setup
+                df.at[index,'sub_setup'] = sub_setup
                 df.to_feather(r"C:\Stocks\local\study\historical_setups.feather")
             if int(self.i) == self.i: col = 'pre_annotation'
             else: col = 'post_annotation'
-            self.window["annotation"].update(self.setups_data.at[math.floor(self.i),col])
+            bar = self.setups_data.iloc[math.floor(self.i)]
+            self.window["-annotation-"].update(bar[col])
+            ss = list(self.sub_setups_list[bar['setup']])
+            self.window['-sub_setup-'].update(values = ss, value = bar['sub_setup'])
         self.window.maximize()
 
 if __name__ == "__main__":
-    UI.loop(UI,True)
-
-
-
-
-          g1 = [[sg.Text("true EP")],
-                      [sg.Text("range EP")],
-                      [sg.Text("pivot EP")],
-                      [sg.Text("low EP")],
-                      [sg.Text("volume EP")]
-                      ]
-                g2 = [     [sg.Text("backside NEP")],
-                      [sg.Text("range NEP")],
-                      [sg.Text("pivot NEP")],
-                      [sg.Text("high NEP")]]
-
-                g3 = [    [sg.Text("strong P")],
-                      [sg.Text("weak P")],
-                      [sg.Text("range P")],
-                      [sg.Text("pocket P")]]
-
-                g4 = [ [sg.Text("strong NP")],
-                      [sg.Text("weak NP")],
-                      [sg.Text("range NP")]]
-                      
-
-
-                      
-                g5 =   [[sg.Text("nep MR")],
-                      [sg.Text("parabolic MR")],
-                      [sg.Text("straight MR")],
-                      [sg.Text("extended MR")]]
-
-                g6 = [     [sg.Text("bull F")],
-                      [sg.Text("bear F")],
-                      [sg.Text("breakdown F")],
-                      [sg.Text("breakout F")]]
+    Study.run(Study,False)

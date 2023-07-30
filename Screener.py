@@ -1,3 +1,7 @@
+
+
+#organize so screener shit on top scan on bottom
+
 from discordwebhook import Discord
 import pathlib
 import time 
@@ -11,6 +15,7 @@ from Study import Study as study
 import statistics
 from Data import Data as data
 from tqdm import tqdm
+import mplfinance as mpf
 import os
 from tensorflow.keras.models import load_model
 
@@ -196,8 +201,7 @@ class Screener:
 		data.consolidate_setups()
 
 	def screen(container):
-		#setuplist = ['d_EP','d_NEP','d_P', 'd_F', 'd_MR', 'd_NP','d_NF']
-		setuplist = ['d_EP']
+		setuplist = ['d_EP','d_NEP','d_P', 'd_F', 'd_MR', 'd_NP','d_NF']
 		threshold = .25
 		model_list = []
 		tf = container[0][2]
@@ -213,7 +217,7 @@ class Screener:
 			tf = bar[2]
 			path = bar[3]
 			df = data.get(ticker,tf,date,200)
-			dolVol, adr, pmDolVol = Screener.requirements(df,-1,path,ticker)
+			dolVol, adr, pmDolVol = Screener.get_requirements(df,-1,path,ticker)
 			if ((dolVol > 8000000 or pmDolVol  > .5 * 1000000) and adr > 2.8 and tf == 'd'):
 				dfs.append(df)
 				tickers.append(ticker)
@@ -232,9 +236,9 @@ class Screener:
 			return 1000000 , 100000 , 1000000
 		dol_vol_l = 15
 		adr_l = 15
-		if dol_vol_l > length:
+		if dol_vol_l > length - 1:
 			dol_vol_l = length - 1
-		if adr_l > length:
+		if adr_l > length - 1:
 			adr_l = length - 1
 		dolVol = []
 		for i in range(dol_vol_l):
@@ -270,7 +274,7 @@ class Screener:
 
 			discordintraday.post(file={"test": open('tmp/test.png', "rb")})
 		elif path == 1:
-			d = "C:/Screener/tmp/subsetups/today" + str(os.getpid()) + ".feather"
+			d = "C:/Stocks/local/screener/subsetups/current_" + str(os.getpid()) + ".feather"
 			try: setups = pd.read_feather(d)
 			except: setups = pd.DataFrame()
 			add =pd.DataFrame({'ticker': [ticker],
@@ -280,7 +284,7 @@ class Screener:
 			setups = pd.concat([setups,add]).reset_index(drop = True)
 			setups.to_feather(d)
 		elif path == 0:
-			d = "C:/Screener/tmp/subsetups/" + str(os.getpid()) + ".feather"
+			d = "C:/Stocks/local/screener/subsetups/historical_" + str(os.getpid()) + ".feather"
 			try: setups = pd.read_feather(d)
 			except: setups = pd.DataFrame()
 			add = pd.DataFrame({'ticker':[ticker],
@@ -304,7 +308,7 @@ if __name__ == '__main__':
 		while datetime.datetime.now().hour < 13:
 			Screener.run(tf = '1min', date = '0',browser = browser)
 	else:
-		Screener.run(ticker = ['ENPH'],fpath = 3)
+		Screener.run(ticker = ['ENPH'],fpath = 0)
 
 
 

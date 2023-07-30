@@ -30,64 +30,15 @@ import shutil
 warnings.filterwarnings("ignore")
 
 class Data:
-
-
-
-	def add_setup(ticker,date,setup):
-		if event == 'Yes' or event == 'No' and not data.isTae():
-                    date = (self.setups_data.iloc[int(self.i)][0])
-                    ticker = self.setups_data.iloc[int(self.i)][1]
-                    s = self.setups_data.iloc[int(self.i)][2]
-                    if event == 'Yes':
-                        val = 1
-                        print(f'added {ticker}')
-                    else:
-                        val = 0
-                        print(f'removed {ticker}')
-                    df2 = pd.DataFrame({
-
-
-                    'date':[date],
-                    'ticker':[ticker],
-                    'setup':[val],
-                    'req':[1]
-                    
-                    })
-
-                    if(data.isBen()):
-                        try:
-                            df = pd.read_feather('C:/Screener/sync/database/ben_' + s + '.feather')
-                        except:
-                            df = pd.DataFrame()
-                    elif data.isLaptop():
-                        try:
-                            df = pd.read_feather('C:/Screener/sync/database/laptop_' + s + '.feather')
-                        except:
-                            df = pd.DataFrame()
-                    else:
-                        try:
-                            df = pd.read_feather('C:/Screener/sync/database/aj_' + s + '.feather')
-                        except:
-                            df = pd.DataFrame()
-
-                    df = pd.concat([df,df2]).reset_index(drop = True)
-                    
-                    if(data.isBen()):
-                        df.to_feather('C:/Screener/sync/database/ben_' + s + '.feather')
-                    elif data.isLaptop():
-                        df.to_feather('C:/Screener/sync/database/laptop_' + s + '.feather')
-                
-                    else:
-                        df.to_feather('C:/Screener/sync/database/aj_' + s + '.feather')
-
-
-
-
-
-
-
-
-
+	
+	def add_setup(ticker,date,setup,val):
+		add = pd.DataFrame({ 'ticker':[date], 'datetime':[ticker], 'value':[val], 'required':[1] })
+		ident = Data.identify()
+		path = 'C:/Stocks/sync/database/' + ident + '_' + setup + '.feather'
+		try: df = pd.read_feather(path)
+		except FileNotFoundError: df = pd.DataFrame()
+		df = pd.concat([df,add])
+		df.to_feather(path)
 
 	def is_market_open():
 		dayOfWeek = datetime.datetime.now().weekday()
@@ -109,7 +60,7 @@ class Data:
 		raise Exception('No idetifcation file')
 
 	def get_nodes():
-		if Data.ideentify == 'laptop':
+		if Data.identify == 'laptop':
 			return 8
 		return 5
 
@@ -188,7 +139,6 @@ class Data:
 			add = add[add_index:]
 			return pd.concat([df,add]).reset_index(drop = True)
 		df = feather.read_feather(Data.data_path(ticker,tf))
-		
 		if dt != None:
 			dt = Data.format_date(dt)
 			adj_dt = adjust_date(dt,tf) #round date to nearest non premarket datetime
@@ -200,7 +150,7 @@ class Data:
 					index = Data.findex(df,adj_dt)
 			except:
 				return pd.DataFrame()
-			df = df[:index + 1 + offset]
+			if offset == 0: df = df[:index + 1]
 			if dt.hour < 5 or (dt.hour == 5 and dt.minute < 30):  ####if date requested is premarket
 				if 'd' in tf or 'w' in tf:
 					df = append_tv(ticker,tf,df,True)
@@ -221,6 +171,9 @@ class Data:
 		if 'h' in tf: df.index = df.index + pd.Timedelta(minutes = 30)
 		elif 'w' in tf: 
 			df = pd.concat([df,last_bar])
+		if 'd' in tf or 'w' in tf:
+			df.index = df.index + pd.Timedelta(minutes = 570)
+		if offset != 0: df = df[:Data.findex(df,dt)+offset]
 		df = df[-bars:]
 		return df
 
@@ -302,24 +255,24 @@ class Data:
 				shutil.rmtree((path + b))
    
 	def consolidate_setups():
-		path = "C:/Stocks/local/subsetups/"
+		path = "C:/Stocks/local/screener/subsetups/"
 		if not os.path.exists(path):
 			os.mkdir(path)
 
 		dir_list = os.listdir(path)
 		try:
-			historical_setups = pd.read_feather(r"C:\Stocks\local\study\histrocial_setups.feather")
+			historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 		except:
 			historical_setups = pd.DataFrame()
 		todays_setups = pd.DataFrame()
 		if len(dir_list) > 0:
 			for f in dir_list:
-				if "today" in f:
+				if "current" in f:
 					df = pd.read_feather(path + f)
 					todays_setups = pd.concat([todays_setups,df])
 				else:
 					df = pd.read_feather(path + f)
-					setups = pd.concat([setups,df])
+					historical_setups = pd.concat([historical_setups,df])
 			if not historical_setups.empty:
 				historical_setups.reset_index(inplace = True,drop = True)
 				historical_setups.to_feather(r"C:\Stocks\local\study\historical_setups.feather")
@@ -519,9 +472,7 @@ class Data:
 
 if __name__ == '__main__':
 	#Data.update()
-	Data.combine_training_data()
-	Data.train('d_EP',.1,100)
-	
+	Data.consolidate_setups()
 
 
 
