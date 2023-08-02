@@ -140,38 +140,11 @@ class Study:
             intraday == True
             if tf == '1min': tf_list = ['d','h','5min','1min']
             else: tf_list = ['d','h',tf,'1min']
-        ident = data.identify()
-        if ident == 'laptop':
-            if current:
-                fs = .49
-                fw = 41
-                fh = 18
-                dpi = 330
-            else:
-                fs = .49
-                fw = 41
-                fh = 18
-                dpi = 330
-        elif ident == 'desktop':
-            if current:
-                fs = 1.08
-                fw = 15
-                fh = 7
-            else:
-                fw = 20
-                fh = 7
-                fs = .8
-        elif ident == 'tae':
-            if current:
-                fs = .75
-                fw = 41
-                fh = 18
-            else:
-                fs = .6
-                fw = 41
-                fh = 18
-        elif ident == 'ben':
-            raise Exception('undefined figure scales')
+
+        fs = data.get_scale('Study fs')
+        fw = data.get_scale('Study fw')
+        fh = data.get_scale('Study fh')
+        dpi = data.get_scale('Study dpi')
         plt.rcParams.update({'font.size': 30})
         mc = mpf.make_marketcolors(up='g',down='r')
         s  = mpf.make_mpf_style(marketcolors=mc)
@@ -181,14 +154,11 @@ class Study:
         first_minute_close = 1
         first_minute_volume = 0
         for tf in tf_list:
-           
             p = pathlib.Path("C:/Stocks/local/study/charts") / f'{ii}{i}.png'
             try:
                 chart_size = 100
-                if 'min' in tf:
-                    chart_offset = chart_size - 1
-                else:
-                    chart_offset = 20
+                if 'min' in tf: chart_offset = chart_size - 1
+                else: chart_offset = 20
                 if not revealed: chart_offset = 0
                 df = data.get(ticker,tf,date,chart_size,chart_offset)
                 if df.empty:
@@ -208,10 +178,8 @@ class Study:
                         df.iat[-1,4] = first_minute_volume
                 if (current or revealed) and ii == 1: title = f'{ticker} {setup} {z} {tf}' 
                 else: title = str(tf)
-                if revealed:
-                    _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[date], alpha = .25))
-                else:
-                    _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
+                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[date], alpha = .25))
+                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
                 ax = axlist[0]
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -233,8 +201,8 @@ class Study:
                 layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
             else:
                 layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],
-                [sg.Combo([],key = '-sub_setup-', size = (20,10)),sg.InputText(key = '-input_sort-')],
-                [sg.Button('Prev'), sg.Button('Next'),sg.Button('Load')]]
+                [sg.Combo([],key = '-sub_setup-', size = (20,10))],
+                [sg.Button('Prev'), sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_sort-')]]
             self.window = sg.Window('Study', layout,margins = (10,10),finalize = True)
             self.init = False
         for i in range(1,5):

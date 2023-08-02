@@ -6,6 +6,14 @@
 #screen for histrocial setups every night if unmarked less than 500 or something
 
 
+#default scale file
+
+#allow no interent functionality
+
+#pool with async funcitonality
+#pool using map and working tqdm
+
+
 import numpy as np
 from typing import Tuple
 from matplotlib import pyplot as plt
@@ -84,7 +92,7 @@ class Data:
 	def findex(df,dt):
 		dt = Data.format_date(dt)
 		if df.index[0] > dt:
-			raise Exception('date doesnt exist')
+			raise IndexError
 		i = int(len(df)/2)
 		k = i
 		while True:
@@ -102,13 +110,13 @@ class Data:
 		return i
 
 	def data_path(ticker,tf):
-		if Data.identify == 'ben': drive = 'F:/Stocks/local/'
-		else: drive = 'C:/Stocks/local/'
+		if Data.identify == 'ben': drive = 'F:/Stocks/local/data/'
+		else: drive = 'C:/Stocks/local/data/'
 		if 'd' in tf or 'w' in tf: path = 'd/' 
 		else: path = '1min/'
 		return drive + path + ticker + '.feather'
 	
-	def get(ticker = 'QQQ',tf = 'd',dt = None, bars = 0, offset = 0):
+	def get(ticker = 'NFLX',tf = 'd',dt = None, bars = 0, offset = 0):
 
 		def adjust_date(dt,tf):
 			if 'd' in tf or 'w' in tf: tf  = 'd'
@@ -132,24 +140,21 @@ class Data:
 			if not ('d' in tf or 'w' in tf): interval = Interval.in_1_minute
 			else: interval = Interval.in_daily
 			tv = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1")
-			add = tv.get_hist(ticker, exchange, interval=interval, n_bars=10000, extended_session = pm)
+			add = tv.get_hist(ticker, exchange, interval=interval, n_bars=100000, extended_session = pm)
 			add.drop('symbol', axis = 1, inplace = True)
 			add.index = add.index + pd.Timedelta(hours=4)
 			add_index = Data.findex(add,df.index[-1]) + 1
 			add = add[add_index:]
-			return pd.concat([df,add]).reset_index(drop = True)
+			return pd.concat([df,add])
 		df = feather.read_feather(Data.data_path(ticker,tf))
 		if dt != None:
 			dt = Data.format_date(dt)
 			adj_dt = adjust_date(dt,tf) #round date to nearest non premarket datetime
-			try:
-				try:  
-					index = Data.findex(df,adj_dt)
-				except IndexError: 
-					df = append_tv(ticker,tf,df,False)
-					index = Data.findex(df,adj_dt)
-			except:
-				return pd.DataFrame()
+			try:  
+				index = Data.findex(df,adj_dt)
+			except IndexError: 
+				df = append_tv(ticker,tf,df,False)
+				index = Data.findex(df,adj_dt)
 			if offset == 0: df = df[:index + 1]
 			if dt.hour < 5 or (dt.hour == 5 and dt.minute < 30):  ####if date requested is premarket
 				if 'd' in tf or 'w' in tf:
@@ -159,7 +164,7 @@ class Data:
 					if numpy.isnan(pmchange): pmchange = 0
 					pm = df.iat[-1,3] + pmchange
 					date = pd.Timestamp(datetime.datetime.today())
-					row  =pd.DataFrame({'datetime': [dt], 'open': [pm],'high': [pm], 'low': [pm], 'close': [pm], 'volume': [0]}).set_index("datetime")
+					row  =pd.DataFrame({'datetime': [date], 'open': [pm],'high': [pm], 'low': [pm], 'close': [pm], 'volume': [0]}).set_index("datetime")
 					df = pd.concat([df, row])
 		if 'w' in tf: 
 			last_bar = df.tail(1)
@@ -216,7 +221,7 @@ class Data:
 	
 	def run():
 		dirs = ['C:/Stocks/local','C:/Stocks/local/data','C:/Stocks/local/account','C:/Stocks/local/screener',
-				'C:/Stocks/local/study','C:/Stocks/local/trainer','C:/Stocks/local/1min','C:/Stocks/local/d']
+				'C:/Stocks/local/study','C:/Stocks/local/trainer','C:/Stocks/local/data/1min','C:/Stocks/local/data/d']
 		if not os.path.exists("C:/Stocks/local"):
 			for d in dirs:
 				os.mkdir(d)
@@ -461,7 +466,6 @@ class Data:
 		return setups
    
 	def train(setup_type,percent_yes,epochs):
-		
 		setups = Data.sample(setup_type, percent_yes)
 		x, y = Data.format(setups,setup_type)
 		model = Sequential([ Bidirectional( LSTM( 64,  input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),
@@ -470,6 +474,15 @@ class Data:
 		model.fit(x,y,epochs = epochs,batch_size = 64,validation_split = .2,)
 		model.save('C:/Stocks/sync/models/model_' + setup_type)
 
+	def get_scale(name):
+		s  = open("C:/Stocks/scale.txt", "r").read()
+		bars = s.split('-')
+		for bar in bars:
+			if name.split(' ')[0] in bar: break
+		lines = bar.splitlines()
+		for line in lines:
+			if name.split(' ')[1] in line: break
+		return float(line.split('=')[1].replace(' ',''))
 if __name__ == '__main__':
 	#Data.update()
 	Data.consolidate_setups()

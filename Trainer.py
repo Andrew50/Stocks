@@ -2,14 +2,13 @@
 
 
 
-from Data7 import Data as data
+from Data import Data as data
 import matplotlib.pyplot as plt
 import random
 import mplfinance as mpf
 import pandas as pd
 import PySimpleGUI as sg
 from multiprocessing.pool import Pool
-
 from PIL import Image
 import time
 import sys
@@ -19,19 +18,11 @@ import io
 import matplotlib.ticker as mticker
 import shutil
 import os
-from Detection2 import Detection as detection
 from tensorflow.keras.models import load_model
-
-from Create import Create as create
 import math
-
-
-from modelTest import modelTest
-
-
+import sys
 
 class Trainer:
-
 
 	def log(self):
 		if self.event == 'Clear' or self.event == 'cl':
@@ -39,7 +30,6 @@ class Trainer:
 				if self.current_setups[i][0] == self.index:
 					for k in range(2):
 						self.window["-GRAPH-"].MoveFigure(self.current_setups[i][2][k],5000,0)
-
 					del self.current_setups[i]
 			self.window.refresh()
 		else:
@@ -62,6 +52,7 @@ class Trainer:
 		ticker = self.dict[self.i][0]
 		ii = 0
 		for s in self.setup_list:
+			datetime = df1.index
 			df = pd.DataFrame()
 			df['date'] = df1.index
 			df['ticker'] = ticker
@@ -79,17 +70,9 @@ class Trainer:
 						df = pd.concat([df,df2]).reset_index(drop = True)
 			df = df[self.cutoff:]
 			add = df[['ticker','date','setup']]
-
-
-
 			if not self.use_no:
 				add = add[df['setup'] == 1]
-
-
-
-
 			add['req'] = 0
-			
 			try:
 				if(data.isBen()):
 					df = pd.read_feather('C:/Screener/sync/database/ben_' + s + '.feather')
@@ -107,7 +90,6 @@ class Trainer:
 			else:
 				df.to_feather('C:/Screener/sync/database/aj_' + s + '.feather')
 			ii += 1
-	
 
 	def tune(self,val):
 		s = self.current_setup
@@ -134,8 +116,6 @@ class Trainer:
 			df = pd.DataFrame()
 
 		df = pd.concat([df,add]).reset_index(drop = True)
-		
-		
 		if(data.isBen()):
 			df.to_feather('C:/Screener/sync/database/ben_' + s + '.feather')
 		elif data.isLaptop():
@@ -260,7 +240,6 @@ class Trainer:
 			self.init = False
 			self.window.maximize()
 		done = False
-		
 		if self.menu == 2:
 			path = "C:/Screener/setups//charts/"
 			keyword = f'_{self.i}_'
@@ -343,53 +322,34 @@ class Trainer:
 					df = pd.read_feather('C:/Screener/sync/database/laptop_' + setup + '.feather')
 				else:
 					df = pd.read_feather('C:/Screener/sync/database/aj_' + setup + '.feather')
-
-				
 			except:
 				df = pd.DataFrame()
-				
-
-			
 			df2 = pd.DataFrame({
 			'ticker':[ticker],
 			'date':[date],
 			'setup':[1],
 			'req':[0]})
 			df = pd.concat([df,df2]).reset_index(drop = True)
-				
-
-			
 			if(data.isBen()):
 				df.to_feather('C:/Screener/sync/database/ben_' + setup + '.feather')
 			elif data.isLaptop():
 				df.to_feather('C:/Screener/sync/database/laptop_' + setup + '.feather')
 			else:
 				df.to_feather('C:/Screener/sync/database/aj_' + setup + '.feather')
-
-		
 		except TimeoutError as e:
 			sg.Popup(e)
-	def loop(self):
+	def rum(self):
 
-		if os.path.exists("C:/Screener/ben.txt"):
-			self.height = 850
-			self.width = 2000
-		elif os.path.exists("C:/Screener/laptop.txt"):
-			self.height = 2050
-			self.width = 3900
-		else:
-			self.height = 1150
-			self.width = 2500
+		self.chart_height = data.get_scale('Trainer chart_height')
+		self.chart_width = data.get_scale('Trainer chart_width')
 		self.cutoff = 75
 		self.size = 300
-
 		self.use_no = True
 		with Pool(6) as self.pool:
-			if os.path.exists("C:/Screener/setups/charts"):
-				shutil.rmtree("C:/Screener/setups/charts")
-			os.mkdir("C:/Screener/setups/charts")
+			if os.path.exists("C:/Stocks/local/trainer/charts"):
+				shutil.rmtree("C:/Stocks/local/trainer/charts")
+			os.mkdir("C:/Stocks/local/trainer/charts")
 			sg.theme('DarkGrey')
-			#self.setup_list = ['EP', 'NEP' , 'P','NP' , 'MR' ,'PS', 'F' , 'NF']
 			self.full_setup_list = create.get_setups_list()
 			self.setup_list = self.full_setup_list
 			self.scale = 4
@@ -398,13 +358,10 @@ class Trainer:
 			self.menu = 3
 			self.current_setup = self.setup_list[0]
 			self.current_tf = 'd'
-
-
 			self.init = True
 			self.dict = []
 			self.tickers = pd.read_feather(r"C:\Screener\sync\full_ticker_list.feather")['Ticker'].to_list()
 			self.index = -1
-		
 			self.preload(self)
 			self.update(self)
 			while True:
@@ -422,15 +379,12 @@ class Trainer:
 							self.i += 1
 							self.update(self)
 							self.preload(self)
-
-
 				elif self.event == '1min' or self.event == 'h' or self.event == 'd' or self.event == 'w':
 					self.current_tf = self.event
 					self.window.close()
 					self.init = True
 					self.i = 0
 					while True:
-
 						try:
 							if os.path.exists("C:/Screener/setups/charts"):
 								shutil.rmtree("C:/Screener/setups/charts")
@@ -439,10 +393,7 @@ class Trainer:
 						except:
 							pass
 					self.preload(self)
-
 					self.update(self)
-
-
 				elif self.event == 'Remove':
 					i = self.setups_df.iloc[self.i]['sindex']
 					setup = self.current_setup
@@ -458,23 +409,17 @@ class Trainer:
 						self.i += 1
 						self.update(self)
 						self.preload(self)
-
 				elif self.event == 'Yes' or self.event == 'No' or self.event == 'Skip':
 					if self.event == 'Skip':
 						pass
-
 					else:
 						if self.event == 'No':
 							v = 0
 						else:
 							v = 1
-
 						self.tune(self,v)
-
 					self.i += 1
 					self.update(self)
-					#self.preload(self)
-					
 				elif self.event == 'Prev':
 					if self.i > 0:
 						self.i -= 1
@@ -486,38 +431,28 @@ class Trainer:
 					self.preload(self)
 					self.current_setups = []
 					self.index = 0
-
 				elif self.event == 'Enter':
 					self.manual_log(self)
-
 				elif self.event == 'Toggle':
 					if self.use_no:
 						self.use_no = False
 					else:
 						self.use_no = True
-
 					self.window['-use_no-'].update('use no ' + str(self.use_no))
-
-
 				elif self.event == '-GRAPH-':
 					self.click(self)
 				elif self.event == 'Trainer' or self.event == 'Validator' or self.event == 'Tuner' or self.event == 'Manual':
-					#self.pool.terminate()
 					if self.event == 'Trainer':
 						self.menu = 0
 					elif self.event == 'Validator':
 						self.menu = 1
 					elif self.event == 'Tuner':
 						self.menu = 2
-
 					elif self.event == 'Manual':
 						self.menu = 3
-
-
 					self.window.close()
 					self.i = 0
 					while True:
-
 						try:
 							if os.path.exists("C:/Screener/setups/charts"):
 								shutil.rmtree("C:/Screener/setups/charts")
@@ -525,23 +460,16 @@ class Trainer:
 							break
 						except:
 							pass
-					#if self.menu == 2:
-					#	self.menu = 0
-					#else:
-					#	self.menu += 1
 					self.init = True
-
 					self.setups_df = pd.read_feather('C:/Screener/setups/database/' + self.current_setup + '.feather').sample(frac = 1).reset_index(drop = True)
 					if self.menu == 1:
 						self.setups_df = self.setups_df[self.setups_df['setup'] == 1]
-					#self.current_setup = 'EP'
 					if self.menu != 3:
 						self.preload(self)
 					self.update(self)
 				elif self.event == 'right' or self.event == 'left':
 					self.click(self,False)
 				else:
-					#self.pool.terminate()
 					if self.menu == 0:
 						self.log(self)
 					else:
@@ -551,7 +479,6 @@ class Trainer:
 						else:
 							pass
 						while True:
-
 							try:
 								if os.path.exists("C:/Screener/setups/charts"):
 									shutil.rmtree("C:/Screener/setups/charts")
@@ -607,63 +534,38 @@ class Trainer:
 				if i < len(self.setups_df):
 					try:
 						bar = self.setups_df.iloc[i]
-						
 						ticker = bar[0]
-						
 						date = bar[1]
-					
 						df = data.get(ticker,self.current_setup.split('_')[0])
 						index = data.findex(df,date)
 					
 						left = index-self.size
 						if left < 0:
 							left = 0
-
 						df2 = df[left:index + 1]
 						arglist.append([i,df2])
 					except TimeoutError as e:
 						print(e)
 						arglist.append([i,pd.DataFrame()])
-					
-					
 		elif self.menu == 2:
 			tickers = pd.read_feather(r"C:\Screener\sync\full_ticker_list.feather")['Ticker'].to_list()
 			for i in range(8):
 				arglist.append([self.current_setup,tickers])
-
-				
 		self.pool.map_async(self.plot,arglist)
 
 	def plot(bar):
 
-
 		def save(df,strubg,fucked = False):
-			
-			
 			try:
-				if os.path.exists("C:/Screener/laptop.txt"): #if laptop
-					fw = 22
-					fh = 12
-					fs = 4.1
-				elif os.path.exists("C:/Screener/ben.txt"):
-					fw = 27
-					fh = 12
-					fs = 1.6
-				else:
-					fw = 50
-					fh = 23
-					fs = 2.28
 				mc = mpf.make_marketcolors(up='g',down='r')
 				s  = mpf.make_mpf_style(marketcolors=mc)
 				fig, axlist = mpf.plot(df, type='candle', volume=True  ,                          
-				style=s, warn_too_much_data=100000,returnfig = True,figratio = (fw,fh),
-				figscale=fs, panel_ratios = (5,1), title = tit,
+				style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_scale('Trainer fw'),data.get_scale('Trainer fh')),
+				figscale=data.get_scale('Trainer fs'), panel_ratios = (5,1), title = tit,
 				tight_layout = True,axisoff=True)
 				ax = axlist[0]
 				ax.set_yscale('log')
 				ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
-
-
 				if fucked:
 					path = "C:/Screener/setups//charts/"
 					i = 0
@@ -676,55 +578,31 @@ class Trainer:
 								break
 						if done:
 							break
-
 					strubg = '_' + str(i) + '_' + strubg + ".png"
-
-				
 				p = pathlib.Path("C:/Screener/setups/charts") / strubg
-
 				plt.savefig(p, bbox_inches='tight')
 			except Exception as e:
 				print(e)
 				p = pathlib.Path("C:/Screener/setups/charts") / strubg
 				shutil.copy(r"C:\Screener\tmp\blank.png",p)
-
-
-
 		i = bar[0]
-		
 		if isinstance(bar[0], str):
 			setuptype = bar[0]
 			tickers = bar[1]
-			
 			model = load_model('C:/Screener/sync/models/model_'+ setuptype)
-			
 			sys.stdout = open(os.devnull, 'w')
 			while True:
-				
 				try:
-
-
 					ticker = tickers[random.randint(0,len(tickers)-1)]
 					df = data.get(ticker,tf = setuptype.split('_')[0])
 					if len(df) > 10:
 						size = len(df)
-						
 						for _ in range((int(size/2))):
 							currentday = random.randint(0,size - 1)
-				
 							dolVol, adr, pmDolVol = detection.requirements(df,currentday,0,ticker)
 							if (dolVol > 8000000 or pmDolVol  > .5 * 1000000) and adr > 2.8:
-
-
-
 								df2 = create.reform(df,setuptype,currentday)
-								#print(df2)
-								
-
 								z = model.predict(df2)[0][1]
-								
-							
-								
 								if z > .3:
 									tit = str(round(z*100))
 									god = currentday - 100
@@ -733,38 +611,16 @@ class Trainer:
 									df = df[god:currentday + 1]
 									date = df.index[-1].date()
 									tickerdate = f'+{ticker}+{date}+'
-
-
-									
-
-
 									save(df,tickerdate,True)
-
-			
 				except Exception as e:
 					pass
-					#sys.stdout = sys.__stdout__
-					#print(e)
 			sys.stdout = sys.__stdout__
 		else:
 			df = bar[1]
 			strubg = str(i) + ".png"
 			tit = ''
 			save(df,strubg)
-
-
-
-
-
-
-
-
-
-
-
-		
 		p = pathlib.Path("C:/Screener/setups/charts") / strubg
-
 		try:
 			if os.path.exists("C:/Screener/laptop.txt"): #if laptop
 				fw = 22
@@ -791,251 +647,34 @@ class Trainer:
 		except:
 			shutil.copy(r"C:\Screener\tmp\blank.png",p)
 
-if __name__ == '__main__':
-	Trainer.loop(Trainer)
-
-
-
-
-
-
-
-
-import random
-import pandas as pd
-from Create import Create as create
-import time
-import sys, os
-from tensorflow.keras.models import load_model
-import mplfinance as mpf
-from Data7 import Data as data
-from matplotlib import pyplot as plt
-import datetime
-
-class modelTest:
-	def runRandomTicker(setuptype,thresh):
-		print('testing with random')
-
-
-		
-		while True:
-			arglist = []
-			for _ in range(100):
-				arglist.append([setuptype,thresh])
-
-			data.pool(modelTest.testRandom,arglist)
-
-	def testRandom(bar):
-		setuptype = bar[0]
-		thresh = bar[1]
-		time = datetime.datetime.now()
-
-		
-		model = load_model('C:/Screener/sync/models/model_' + setuptype)
-	   
-		tickers = pd.read_feather(r"C:\Screener\sync\full_ticker_list.feather")['Ticker'].to_list()
-		while True:
-			try:
-				ticker = tickers[random.randint(0,len(tickers)-1)]
-
-				tickerdf = data.get(ticker)
-				if(len(tickerdf) > 10):
-					date_list = tickerdf.index.to_list()
-					date = date_list[random.randint(0,len(date_list) - 1)]
-					if(tickerdf.iloc[data.findex(tickerdf, date)]['volume'] > 250000):
-						df = create.test_data(ticker, date, setuptype)
-						
-					   
-						sys.stdout = open(os.devnull, 'w')
-						god = model.predict(df)
-						
-						val = 0
-						if god[0][1] > thresh:
-							val = 1
-						sys.stdout = sys.__stdout__
-				
-				
-			   
-						if val == 1:
-						   
-							df1 = data.get(ticker)
-
-
-							ind= data.findex(df1,date)
-
-							left = ind - 50
-							if left < 0:
-								left = 0
-							df1 = df1[left:ind + 2]
-							
-
-				   
-							mc = mpf.make_marketcolors(up='g',down='r')
-							s  = mpf.make_mpf_style(marketcolors=mc)
-							print(god[0][1])
-							mpf.plot(df1, type='candle', volume=True  , 
-							title = str(god[0][1]),
-							style=s, warn_too_much_data=100000,returnfig = True, panel_ratios = (5,1), 
-							tight_layout = True,
-							vlines=dict(vlines = [date])
-							#colors = colorlist, alpha = .2,linewidths=1),
-								)      
-							plt.show()
-
-				   
-			except:
-			#(ValueError, FileNotFoundError, TimeoutError, TypeError):
-				pass
-
-
-
-
 	def runTestData(setuptype,tickers, dates):
-
 		model = load_model('C:/Screener/sync/models/model_'+ setuptype)
-		#setups = pd.read_feather('C:/Screener/setups/database/Testdata_' + setuptype + '.feather')
-	   
-		right = 0
-		total = 0
-
-		ii = 0
-
 		while True:
 			ticker = tickers[ii]
 			date = dates[ii]
 			try:
-			
 				df = create.test_data(ticker,date, setuptype)
-
-			
 				sys.stdout = open(os.devnull, 'w')
 				god = model.predict(df)[0][1] * 100
-
 				sys.stdout = sys.__stdout__
-		
 				if True:
 					df1 = data.get(ticker,date = date)
-
-					
 					ind= data.findex(df1,date) 
 					left = ind - 100
 					if left < 0:
 						left = 0
 					df1 = df1[left:ind + 1]
-					#print(df1)
 					mc = mpf.make_marketcolors(up='g',down='r')
 					s  = mpf.make_mpf_style(marketcolors=mc)
-			
 					mpf.plot(df1, type='candle', volume=True  , 
 					title = str(god),
 					style=s, warn_too_much_data=100000,returnfig = True, panel_ratios = (5,1), 
 					tight_layout = True
-					 #  vlines=dict(vlines=[date])
-					#colors = colorlist, alpha = .2,linewidths=1),
 					)
-				
-		
 					plt.show()
-
-
-
 			except TimeoutError:#(TypeError, ValueError, IndexError):
 				pass
-
-
 			ii += 1
-	
-		
-
-
-
 
 if __name__ == "__main__":
-
-
-	setup = 'h_F'
-	#modelTest.combine(True,True)
-	if True:
-		setuptype = setup
-
-		epochs = 200
-		new = True
-		prcnt_setup = .1
-
-
-		modelTest.combine(new,setuptype)
-
-		create.run(setuptype,prcnt_setup,epochs,False)
-	
-	if False:
-		s = setup
-		modelTest.runRandomTicker(s,.25)
-
-	if False:
-		if setup == 'EP':
-
-
-			tickers = ['IOT','SMCI','ONON'   ,'SE','DUOL','FSLR','XPEV','SHLS','CELH','CALX','qqq','qqq','qqq','qqq','qqq',
-				   'mgni','aehr','nflx','coin'        ]
-			dates = ['2023-06-02','2023-05-03','2023-03-21','2023-03-07','2023-03-01','2023-03-01','2022-11-30','2022-11-15','2022-11-10','2022-10-25','2023-03-29','2022-11-10','2022-09-13','2022-08-10','2022-07-27',
-				 '2022-11-10','2023-01-06','2023-01-20']     
-		
-
-		elif setup == 'NEP':
-			pass
-		elif setup =='P':
-			dates = ['2023-07-06','2023-06-14','2023-05-25','2023-04-26']
-			tickers = ['geni','next','mod','msft']
-
-
-
-			#dates = ['2021-05-20','2023-03-29','2022-11-10','2022-08-10','2022-07-27',
-			#			 '2022-11-10','2023-01-06','2023-01-20','2023-01-09']
-
-			#tickers = ['coin','qqq','qqq','qqq','qqq',
-			#			   'mgni','aehr','nflx','coin']
-
-
-
-		elif setup == 'NP':
-
-			dates = ['2023-06-20','2023-03-01','2023-06-06','2023-02-16','2023-06-07','2023-07-19']
-			tickers = ['ffie','rivn','nvcr','shop','base','tost']
-
-		elif setup == 'NF':
-			dates = ['2022-12-02','2023-05-24']
-			tickers = ['open','pton',]
-		elif setup == 'F':
-			dates = ['2023-07-24','2023-07-24','2023-03-31','2023-03-10','2023-03-30','2020-08-13','2020-11-10','2023-01-05']
-			#dates = ['2023-03-02','2023-01-26','2023-07-12','2023-06-28','2023-07-20','2023-07-12','2023-07-13','2023-04-17','2023-07-12','2023-04-03','2023-03-09','2023-03-29','2023-06-13']
-			#,'2020-08-13','2020-11-10','2023-01-05',
-			#		 '2023-01-04','2023-02-16','2023-03-22','2023-01-04','2023-01-04',
-			#		 '2022-01-05','2022-10-18','2023-01-03','2022-12-09','2022-09-06',
-			#		 '2023-03-31','2022-04-11','2022-04-11','2022-08-04','2022-09-22',
-			#		 '2023-08-03']
-
-			tickers = ['RIVN','XPEV' ,'dpst','riot','meli','tsla','tsla','elf']
-			#tickers = ['gotu','iq','fngu','alto','xp','mod','nkla','cbay','nvda','dpst','riot','meli','ai']
-			  #,'tsla','tsla','elf',
-					#   'mlco','mlco','aehr','cweb','tme',
-					#   'nue','kold','orcl','amat','enph',
-					#   'mdb','pump','oxy','mrna','celh',
-					#   'rytm']
-
-		modelTest.runTestData(setup,tickers,dates)
-	
-	## EP 
-	#thresh = .6
-
-	
-
-	#modelTest.runRandomTicker(setuptype,thresh)
-   
-
-
-
-
-
-
-
-
+	Trainer.run(Trainer)
