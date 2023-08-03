@@ -29,14 +29,9 @@ class Trainer:
 
 	def run(self):
 		with Pool(6) as self.pool:
-			if os.path.exists('C:/Stocks/local/trainer/charts'):
-				shutil.rmtree('C:/Stocks/local/trainer/charts')
-			os.mkdir('C:/Stocks/local/trainer/charts')
 			self.menu_list = ['Trainer','Validator','Tuner','Tester','Manual']
 			self.full_setup_list = data.get_setups_list()
-			self.i = 0
-			self.chart_edge_offset = 30
-			self.chart_info = []
+			self.chart_edge_offset = data.get_config('Trainer chart_edge_offset')
 			self.current_menu = 'Trainer'
 			self.trainer_cutoff = 60
 			self.selected_trainer_index = 0
@@ -44,30 +39,14 @@ class Trainer:
 			self.current_tf = self.current_setup.split('_')[0]
 			self.full_ticker_list = pd.read_feather('C:/Stocks/sync/files/current_scan.feather')['Ticker'].to_list()
 			self.init = True
-			self.preload(self)
 			self.update(self)
 			while True:
 				self.event, self.values = self.window.read()
-
-
-
-
-
 				if self.event in self.menu_list:  ##
-					if os.path.exists('C:/Stocks/local/trainer/charts'):
-						shutil.rmtree('C:/Stocks/local/trainer/charts')
-					os.mkdir('C:/Stocks/local/trainer/charts')
-					self.chart_info = []
 					self.current_menu = self.event
 					self.init = True
 					self.window.close()
-					self.preload(self)
 					self.update(self)
-				elif self.event in self.tf_list:##
-					self.current_tf = self.event
-				elif self.event in self.full_setup_list:
-					self.current_setup = self.event
-
 
 				elif self.current_menu == 'Trainer':
 					if self.event == 'Skip No' or self.event == 'Use No' :
@@ -77,6 +56,12 @@ class Trainer:
 						self.preload(self)
 					elif self.event == 'right_button' or self.event == 'left_button' or self.event == '-chart-' or self.event == 'center_button':
 						self.click(self)
+					elif self.event in self.tf_list:##
+						self.current_tf = self.event
+						self.init = True
+						self.update(self)
+					elif self.event in self.full_setup_list:
+						self.current_setup = self.event
 					else:
 						self.log(self)
 
@@ -184,8 +169,13 @@ class Trainer:
 
 	def update(self):
 		if self.init:
+			self.chart_info = []
 
-			 #ticker list , datetime list, value list, 
+			self.i = 0
+			if os.path.exists('C:/Stocks/local/trainer/charts'):
+				shutil.rmtree('C:/Stocks/local/trainer/charts')
+			os.mkdir('C:/Stocks/local/trainer/charts')
+			self.chart_info = []
 			self.chart_height = data.get_scale('Trainer ch')
 			self.chart_width = data.get_scale('Trainer cw')
 			data.combine_training_data()
@@ -223,6 +213,7 @@ class Trainer:
 			for k, v in [['<q>', '1'],['<w>', '2'],['<e>', '3'],['<a>', '4'],['<s>', '5'],['<d>', '6'],
 				['<z>', '7'],['<x>', '8'],['<c>', '9'],['<p>', 'right_button'],['<i>', 'left_button'],['<o>', 'center_button']]:
 				self.window.bind(k,v)
+			self.preload(self)
 
 			
 
