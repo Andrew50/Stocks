@@ -14,6 +14,9 @@
 #pool using map and working tqdm
 
 
+#driop duplicates in add_setup (basically replace funciton)
+
+
 import numpy as np
 from typing import Tuple
 from matplotlib import pyplot as plt
@@ -39,8 +42,8 @@ warnings.filterwarnings("ignore")
 
 class Data:
 	
-	def add_setup(ticker,date,setup,val):
-		add = pd.DataFrame({ 'ticker':[date], 'datetime':[ticker], 'value':[val], 'required':[1] })
+	def add_setup(ticker,date,setup,val,req):
+		add = pd.DataFrame({ 'ticker':[ticker], 'datetime':[date], 'value':[val], 'required':[req] })
 		ident = Data.identify()
 		path = 'C:/Stocks/sync/database/' + ident + '_' + setup + '.feather'
 		try: df = pd.read_feather(path)
@@ -328,7 +331,8 @@ class Data:
 				setups.append(s)
 		return setups
 
-	def score(dfs,ticker_list,setup_type,model,threshold):
+	def score(dfs,ticker_list,setup_type,model = None,threshold = None):
+		if model == None: model = load_model('C:/Stocks/sync/models/model_'+ setup_type)
 		x,y= Data.format(dfs,setup_type,False)
 		sys.stdout = open(os.devnull, 'w')
 		scores = model.predict(x)
@@ -480,6 +484,7 @@ class Data:
 		for bar in bars:
 			if name.split(' ')[0] in bar: break
 		lines = bar.splitlines()
+
 		for line in lines:
 			if name.split(' ')[1] in line: break
 		return float(line.split('=')[1].replace(' ',''))

@@ -2,6 +2,10 @@
 
 #organize so screener shit on top scan on bottom
 
+
+#rename columns to lowercase and standards
+#get rid of ticker with / and . or whaetver
+
 from discordwebhook import Discord
 import pathlib
 import time 
