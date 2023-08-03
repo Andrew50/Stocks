@@ -60,8 +60,6 @@ class Trainer:
 						self.current_tf = self.event
 						self.init = True
 						self.update(self)
-					elif self.event in self.full_setup_list:
-						self.current_setup = self.event
 					else:
 						self.log(self)
 
@@ -176,8 +174,8 @@ class Trainer:
 				shutil.rmtree('C:/Stocks/local/trainer/charts')
 			os.mkdir('C:/Stocks/local/trainer/charts')
 			self.chart_info = []
-			self.chart_height = data.get_scale('Trainer ch')
-			self.chart_width = data.get_scale('Trainer cw')
+			self.chart_height = data.get_config('Trainer ch')
+			self.chart_width = data.get_config('Trainer cw')
 			data.combine_training_data()
 			self.full_setup_list = data.get_setups_list()
 			self.current_setup_list = [s for s in self.full_setup_list if self.current_tf in s]
@@ -208,7 +206,7 @@ class Trainer:
 				[sg.Button('Enter')]]
 				if self.current_menu == 'Tester': layout.append(sg.Text(key = '-score-'))
 			layout.append([sg.Button(m) for m in self.menu_list])
-			self.window = sg.Window(self.current_menu, layout,margins = (10,10),scaling=data.get_scale('Trainer ui'),finalize = True)
+			self.window = sg.Window(self.current_menu, layout,margins = (10,10),scaling=data.get_config('Trainer ui'),finalize = True)
 			self.init = False
 			for k, v in [['<q>', '1'],['<w>', '2'],['<e>', '3'],['<a>', '4'],['<s>', '5'],['<d>', '6'],
 				['<z>', '7'],['<x>', '8'],['<c>', '9'],['<p>', 'right_button'],['<i>', 'left_button'],['<o>', 'center_button']]:
@@ -294,12 +292,12 @@ class Trainer:
 			mc = mpf.make_marketcolors(up='g',down='r')
 			s  = mpf.make_mpf_style(marketcolors=mc)
 			fig, axlist = mpf.plot(df, type='candle', volume=True  ,                          
-			style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_scale('Trainer fr'),1),
-			figscale=data.get_scale('Trainer fs'), panel_ratios = (5,1), title = title, tight_layout = True,axisoff=True)
+			style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config('Trainer fr'),1),
+			figscale=data.get_config('Trainer fs'), panel_ratios = (5,1), title = title, tight_layout = True,axisoff=True)
 			ax = axlist[0]
 			ax.set_yscale('log')
 			ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
-			plt.savefig(p, bbox_inches='tight',dpi = data.get_scale('Trainer dpi'))
+			plt.savefig(p, bbox_inches='tight',dpi = data.get_config('Trainer dpi'))
 		except Exception as e:
 			print(e)
 			shutil.copy(r'C:\Stocks\sync\files\blank.png',p)

@@ -478,7 +478,7 @@ class Data:
 		model.fit(x,y,epochs = epochs,batch_size = 64,validation_split = .2,)
 		model.save('C:/Stocks/sync/models/model_' + setup_type)
 
-	def get_scale(name):
+	def get_config(name):
 		s  = open("C:/Stocks/scale.txt", "r").read()
 		bars = s.split('-')
 		for bar in bars:
