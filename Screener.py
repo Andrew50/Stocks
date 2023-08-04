@@ -52,6 +52,7 @@ class Screener:
 
 	def screen(container):
 		tickers = container[0]
+		
 		date = container[1]
 		tf = container[2]
 		path = container[3]
@@ -67,36 +68,7 @@ class Screener:
 			for ticker, z, df in setups:
 				Screener.log(ticker,z,df,tf,path,setup_type)
   
-	def get_requirements(df,currentday,path = None,ticker = None):
-		length = len(df)
-		if length < 5:
-			return 0,0,0
-		if path == 3:
-			return 1000000 , 100000 , 1000000
-		dol_vol_l = 15
-		adr_l = 15
-		if dol_vol_l > length - 1:
-			dol_vol_l = length - 1
-		if adr_l > length - 1:
-			adr_l = length - 1
-		dolVol = []
-		for i in range(dol_vol_l):
-			dolVol.append(df.iat[currentday-1-i,3]*df.iat[currentday-1-i,4])
-		dolVol = statistics.mean(dolVol)              
-		adr= []
-		for j in range(adr_l): 
-			high = df.iat[currentday-j-1,1]
-			low = df.iat[currentday-j-1,2]
-			val = (high/low - 1) * 100
-			adr.append(val)
-		adr = statistics.mean(adr)  
-		if path == 1 and dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
-			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
-			pmprice = df.iat[currentday,0]
-			pmDolVol = pmvol * pmprice
-		else:
-			pmDolVol = 0
-		return dolVol, adr, pmDolVol
+	
 
 	def log(ticker,z, df, tf,  path, setup_type):
 		z = round(z * 100)
@@ -275,7 +247,8 @@ class Screener:
 
 if __name__ == '__main__':
 	
-	if   ((datetime.datetime.now().hour) < 5 or (datetime.datetime.now().hour == 5 and datetime.datetime.now().minute < 40)) and not data.identify == 'laptop':
+	Screener.run(ticker='COIN', fpath=0)
+	'''if   ((datetime.datetime.now().hour) < 5 or (datetime.datetime.now().hour == 5 and datetime.datetime.now().minute < 40)) and not data.identify == 'laptop':
 		Screener.run(datetime.datetime.now())
 		study.current(study,True)
 		browser = Screener.get.startFirefoxSession()
@@ -296,4 +269,4 @@ if __name__ == '__main__':
 				direct = path + dir_list[0]
 				tickers = pd.read_feather(direct)['Ticker'].to_list()
 				Screener.queue(ticker = tickers,fpath = 0)
-				os.remove(direct)
+				os.remove(direct)'''
