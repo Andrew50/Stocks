@@ -113,7 +113,7 @@ class Data:
 		return i
 
 	def data_path(ticker,tf):
-		if Data.identify == 'ben': drive = 'F:/Stocks/local/data/'
+		if Data.identify() == 'ben': drive = 'F:/Stocks/local/data/'
 		else: drive = 'C:/Stocks/local/data/'
 		if 'd' in tf or 'w' in tf: path = 'd/' 
 		else: path = '1min/'
@@ -210,7 +210,7 @@ class Data:
 		ydf.drop(axis=1, labels="Adj Close",inplace = True)
 		ydf.rename(columns={'Open':'open','High':'high','Low':'low','Close':'close','Volume':'volume'}, inplace = True)
 		ydf.dropna(inplace = True)
-		if Data.isMarketOpen() == 1:
+		if Data.is_market_open() == 1:
 			ydf.drop(ydf.tail(1).index,inplace=True)
 		if not exists:
 			df = ydf
@@ -229,8 +229,8 @@ class Data:
 			for d in dirs:
 				os.mkdir(d)
 		tv = TvDatafeed()
-		current_day = tv.get_hist('QQQ', 'NASDAQ', n_bars=2).index[Data.isMarketOpen()]
-		current_minute = tv.get_hist('QQQ', 'NASDAQ', n_bars=2, interval=Interval.in_1_minute, extended_session = False).index[Data.isMarketOpen()]
+		current_day = tv.get_hist('QQQ', 'NASDAQ', n_bars=2).index[Data.is_market_open()]
+		current_minute = tv.get_hist('QQQ', 'NASDAQ', n_bars=2, interval=Interval.in_1_minute, extended_session = False).index[Data.is_market_open()]
 		from Screener import Screener as screener
 		scan = screener.get('current')
 		batches = []
@@ -243,6 +243,15 @@ class Data:
 		Data.combine_training_data()
 		epochs = 200
 		prcnt_setup = .05
+		if(os.path.exists("C:\Stocks\local\data\full_list_minus_annotations.feather") is False):
+			shutil.copy("C\Stocks\sync\files\full_scan.feather", "C:\Stocks\local\data\full_list_minus_annotations.feather")
+		historical_setup_list = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+		full_list_annotations = pd.read_feather(r"C:\Stocks\local\data\full_list_minus_annotations.feather")
+		if(len(historical_setup_list[historical_setup_list["annotation"] == ""]) < 500):
+			full_list_annotations = full_list_annotations.sample(frac=1)
+			addedTickers = full_list_annotations[0:5]
+			full_list_annotations = full_list_annotations[5:]
+			full_list_annotations.to_feather("C:\Stocks\local\data\full_list_minus_annotations.feather")
 		if Data.indentify == 'desktop':
 			for s in setup_list:
 				
@@ -490,7 +499,8 @@ class Data:
 		return float(line.split('=')[1].replace(' ',''))
 if __name__ == '__main__':
 	#Data.update()
-	Data.consolidate_setups()
+	#Data.consolidate_setups()
+	Data.run()
 
 
 
