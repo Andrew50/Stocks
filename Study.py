@@ -71,8 +71,8 @@ class Study:
             if self.current: index_list = [i for i in range(self.preload_amount)]
             else: index_list = [i/2 for i in range(self.preload_amount*2)]
         else: index_list = [self.preload_amount + self.i - 1]
-        arglist = [[self.setups_data,i,self.current] for i in index_list]
-        self.pool.map_async(self.plot,arglist)
+        arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
+        self.pool.map(self.plot,arglist)
         
     def lookup(self):
         try:
@@ -84,26 +84,27 @@ class Study:
                 if not self.init:
                     sort = self.values['-input_sort-']
                     reqs = sort.split('&')
-                    for req in reqs:
-                        if '^' in req:
-                            sort_val = req.split('^')[1]
-                            if sort_val not in scan.columns:
-                                raise TimeoutError
-                        else:
-                            req = req.split('|')
-                            dfs = []
-                            for r in req:
-                                r = r.split('=')
-                                trait = r[0]
-                                if trait not in scan.columns or len(r) == 1:
+                    if sort != "":
+                        for req in reqs:
+                            if '^' in req:
+                                sort_val = req.split('^')[1]
+                                if sort_val not in scan.columns:
                                     raise TimeoutError
-                                val = r[1]
-                                if 'annotation' in trait:
-                                    df = scan[scan[trait].str.contrains(val)]
-                                else:
-                                    df = scan[scan[trait] == val]
-                                dfs.append(df)
-                            scan = pd.concat(dfs).drop_duplicates()
+                            else:
+                                req = req.split('|')
+                                dfs = []
+                                for r in req:
+                                    r = r.split('=')
+                                    trait = r[0]
+                                    if trait not in scan.columns or len(r) == 1:
+                                        raise TimeoutError
+                                    val = r[1]
+                                    if 'annotation' in trait:
+                                        df = scan[scan[trait].str.contrains(val)]
+                                    else:
+                                        df = scan[scan[trait] == val]
+                                    dfs.append(df)
+                                scan = pd.concat(dfs).drop_duplicates()
                 if sort_val != None: scan = scan.sort_values(by = [sort_val], ascending = False)
                 else:scan = scan.sample(frac = 1)
             if scan.empty:
@@ -126,7 +127,9 @@ class Study:
 
     def plot(bar):
         setups_data = bar[0]
+        print(setups_data)
         i = bar[1]
+        #print(i)
         if int(i) != i: revealed = True
         else: revealed = False
         current = bar[2]

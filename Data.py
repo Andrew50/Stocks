@@ -32,7 +32,7 @@ from multiprocessing import Pool
 import warnings
 import yfinance as yf
 import shutil
-
+import statistics
 warnings.filterwarnings("ignore")
 
 class Data:
@@ -81,8 +81,10 @@ class Data:
 
 	def findex(df,dt):
 		dt = Data.format_date(dt)
+		
 		if df.index[0] > dt:
-			raise IndexError
+			print(f"Date {dt} is before dataframe")
+			return 0 
 		i = int(len(df)/2)
 		k = i
 		while True:
@@ -168,7 +170,8 @@ class Data:
 		elif 'w' in tf: 
 			df = pd.concat([df,last_bar])
 		if 'd' in tf or 'w' in tf:
-			df.index = df.index + pd.Timedelta(minutes = 570)
+			df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
+
 		if offset != 0: df = df[:Data.findex(df,dt)+offset]
 		if 'd' not in tf and 'w' not in tf: df = df.between_time('09:30' , '15:59')
 		df = df.dropna()
@@ -198,6 +201,7 @@ class Data:
 		ydf = yf.download(tickers =  ticker,  period = period,  group_by='ticker',      
 			interval = ytf, ignore_tz = True, progress=False,
 			show_errors = False, threads = False, prepost = False) 
+
 		ydf.drop(axis=1, labels="Adj Close",inplace = True)
 		ydf.rename(columns={'Open':'open','High':'high','Low':'low','Close':'close','Volume':'volume'}, inplace = True)
 		ydf.dropna(inplace = True)
@@ -231,7 +235,7 @@ class Data:
 		current_day = tv.get_hist('QQQ', 'NASDAQ', n_bars=2).index[Data.is_market_open()]
 		current_minute = tv.get_hist('QQQ', 'NASDAQ', n_bars=2, interval=Interval.in_1_minute, extended_session = False).index[Data.is_market_open()]
 		from Screener import Screener as screener
-		scan = screener.get('current')
+		scan = pd.DataFrame({"Ticker": ["COIN"]}).set_index("Ticker") #screener.get('current')
 		batches = []
 		for i in range(len(scan)):
 		   ticker = scan.index[i]
@@ -242,7 +246,7 @@ class Data:
 		Data.combine_training_data()
 		epochs = 200
 		prcnt_setup = .05
-		if Data.indentify == 'desktop':
+		if Data.get_config("Data identity") == 'desktop':
 			for s in setup_list:
 				
 				Data.train(s,prcnt_setup,epochs,False)
@@ -344,7 +348,10 @@ class Data:
 				score = scores[i]
 				if score > threshold:
 					ticker = df.iloc[0]['ticker']
-					setups.append([ticker,score,df[:i + 1]])
+					d = df[:i + 1]
+					if(Data.get_requirements(d) == True):
+						print(d)
+						setups.append([ticker,score,d])
 		return setups
 		
 	def worker(bar):
@@ -490,6 +497,45 @@ class Data:
 		try: value = float(value)
 		except: pass
 		return value
+	def get_requirements(df, setupType = None):
+		def setup_requirements(setupType):
+			reqDolVol = 8000000
+			reqAdr = 3
+			reqpmDolVol = 1000000
+
+			return reqDolVol, reqAdr, reqpmDolVol
+		print(df)
+		currentday = -1
+		length = len(df)
+		if length < 5:
+			return False
+		dol_vol_l = 15
+		adr_l = 15
+		if dol_vol_l > length - 1:
+			dol_vol_l = length - 1
+		if adr_l > length - 1:
+			adr_l = length - 1
+		dolVol = []
+		for i in range(dol_vol_l):
+			dolVol.append(df.iat[currentday-1-i,3]*df.iat[currentday-1-i,4])
+		dolVol = statistics.mean(dolVol)              
+		adr= []
+		for j in range(adr_l): 
+			high = df.iat[currentday-j-1,1]
+			low = df.iat[currentday-j-1,2]
+			val = (high/low - 1) * 100
+			adr.append(val)
+		adr = statistics.mean(adr)  
+		if	dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
+			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
+			pmprice = df.iat[currentday,0]
+			pmDolVol = pmvol * pmprice
+		else:
+			pmDolVol = 0
+		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(setupType)
+		if((adr > reqAdr) and ((dolVol > reqDolVol) or (pmDolVol > reqpmDolVol))):
+			return True
+		return False
 
 if __name__ == '__main__':
 	Data.run()
