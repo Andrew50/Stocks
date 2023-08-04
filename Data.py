@@ -1,26 +1,21 @@
 
 
-#remove all premarket from saved df
 
 
 #screen for histrocial setups every night if unmarked less than 500 or something
 
 
-#default scale file
-
 #allow no interent functionality
 
-#pool with async funcitonality
-#pool using map and working tqdm
 
 
-#driop duplicates in add_setup (basically replace funciton)
 
 
 import numpy as np
 from typing import Tuple
 from matplotlib import pyplot as plt
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 from pyarrow import feather
@@ -42,13 +37,14 @@ warnings.filterwarnings("ignore")
 
 class Data:
 	
-	def add_setup(ticker,date,setup,val,req):
+	def add_setup(ticker,date,setup,val,req,ident = None):
+		date = Data.format_date(date)
 		add = pd.DataFrame({ 'ticker':[ticker], 'datetime':[date], 'value':[val], 'required':[req] })
-		ident = Data.identify()
-		path = 'C:/Stocks/sync/database/' + ident + '_' + setup + '.feather'
+		if ident == None: ident = Data.get_config('Data identity') + '_'
+		path = 'C:/Stocks/sync/database/' + ident + setup + '.feather'
 		try: df = pd.read_feather(path)
-		except FileNotFoundError: df = pd.DataFrame()
-		df = pd.concat([df,add])
+		except TimeoutError: df = pd.DataFrame()
+		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','datetime'],keep = 'last').reset_index(drop = True)
 		df.to_feather(path)
 
 	def is_market_open():
@@ -63,21 +59,12 @@ class Data:
 			if(minute <= 15): return 1
 		return 0
 
-	def identify():
-		if os.path.exists("C:/Stocks/local/data/laptop.txt"): return 'laptop'
-		if os.path.exists("C:/Stocks/local/data/desktop.txt"): return 'desktop'
-		if os.path.exists("C:/Stocks/local/data/ben.txt"): return 'ben'
-		if os.path.exists("C:/Stocks/local/data/tae.txt"): return 'tae'
-		raise Exception('No idetifcation file')
+	
 
-	def get_nodes():
-		if Data.identify == 'laptop':
-			return 8
-		return 5
 
 	def pool(deff,arg):
-		pool = Pool(processes = Data.get_nodes())
-		data = list(tqdm(pool.imap(deff, arg), total=len(arg))) #might need to be imap
+		pool = Pool(processes = int(Data.get_config('Data cpu_cores')))
+		data = list(tqdm(pool.imap_unordered(deff, arg), total=len(arg))) #might need to be imap
 		return data
 
 	def format_date(dt):
@@ -113,11 +100,10 @@ class Data:
 		return i
 
 	def data_path(ticker,tf):
-		if Data.identify == 'ben': drive = 'F:/Stocks/local/data/'
-		else: drive = 'C:/Stocks/local/data/'
+		drive = Data.get_config('Data data_drive_letter')
 		if 'd' in tf or 'w' in tf: path = 'd/' 
 		else: path = '1min/'
-		return drive + path + ticker + '.feather'
+		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
 	
 	def get(ticker = 'NFLX',tf = 'd',dt = None, bars = 0, offset = 0):
 
@@ -139,7 +125,7 @@ class Data:
 			if 'h' in tf: dt += datetime.timedelta(minutes = 30)
 			return dt
 		def append_tv(ticker,tf,df,pm):
-			exchange = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('Ticker').loc[ticker]['Exchange']
+			exchange = pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('Ticker').loc[ticker]['Exchange']
 			if not ('d' in tf or 'w' in tf): interval = Interval.in_1_minute
 			else: interval = Interval.in_daily
 			tv = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1")
@@ -150,6 +136,7 @@ class Data:
 			add = add[add_index:]
 			return pd.concat([df,add])
 		df = feather.read_feather(Data.data_path(ticker,tf))
+		
 		if dt != None:
 			dt = Data.format_date(dt)
 			adj_dt = adjust_date(dt,tf) #round date to nearest non premarket datetime
@@ -176,13 +163,17 @@ class Data:
 		if 'h' in tf: df.index = df.index + pd.Timedelta(minutes = -30)
 		if tf != '1min' and tf != 'd':
 			df = df.resample(tf).apply({'open'  : 'first', 'high'  : 'max', 'low':'min', 'close' : 'last', 'volume': 'sum' })
+			
 		if 'h' in tf: df.index = df.index + pd.Timedelta(minutes = 30)
 		elif 'w' in tf: 
 			df = pd.concat([df,last_bar])
 		if 'd' in tf or 'w' in tf:
 			df.index = df.index + pd.Timedelta(minutes = 570)
 		if offset != 0: df = df[:Data.findex(df,dt)+offset]
+		if 'd' not in tf and 'w' not in tf: df = df.between_time('09:30' , '15:59')
+		df = df.dropna()
 		df = df[-bars:]
+		df['ticker'] = ticker
 		return df
 
 	def update(bar):
@@ -210,7 +201,7 @@ class Data:
 		ydf.drop(axis=1, labels="Adj Close",inplace = True)
 		ydf.rename(columns={'Open':'open','High':'high','Low':'low','Close':'close','Volume':'volume'}, inplace = True)
 		ydf.dropna(inplace = True)
-		if Data.isMarketOpen() == 1:
+		if Data.is_market_open() == 1:
 			ydf.drop(ydf.tail(1).index,inplace=True)
 		if not exists:
 			df = ydf
@@ -220,17 +211,25 @@ class Data:
 			ydf = ydf[index + 1:]
 			df = pd.concat([df, ydf])
 		df.index.rename('datetime', inplace = True)
+		if tf == '1min':
+			df = df.between_time('09:30' , '15:59')
 		feather.write_feather(df,Data.data_path(ticker,tf))
-	
-	def run():
+
+	def setup_directories():
 		dirs = ['C:/Stocks/local','C:/Stocks/local/data','C:/Stocks/local/account','C:/Stocks/local/screener',
 				'C:/Stocks/local/study','C:/Stocks/local/trainer','C:/Stocks/local/data/1min','C:/Stocks/local/data/d']
 		if not os.path.exists("C:/Stocks/local"):
 			for d in dirs:
 				os.mkdir(d)
+		if not os.path.exists("C:/Stocks/config.txt"):
+			shutil.copyfile('C:/Stocks/sync/files/default_config.txt','C:/Stocks/config.txt')
+			
+	def run():
+		
+
 		tv = TvDatafeed()
-		current_day = tv.get_hist('QQQ', 'NASDAQ', n_bars=2).index[Data.isMarketOpen()]
-		current_minute = tv.get_hist('QQQ', 'NASDAQ', n_bars=2, interval=Interval.in_1_minute, extended_session = False).index[Data.isMarketOpen()]
+		current_day = tv.get_hist('QQQ', 'NASDAQ', n_bars=2).index[Data.is_market_open()]
+		current_minute = tv.get_hist('QQQ', 'NASDAQ', n_bars=2, interval=Interval.in_1_minute, extended_session = False).index[Data.is_market_open()]
 		from Screener import Screener as screener
 		scan = screener.get('current')
 		batches = []
@@ -246,7 +245,7 @@ class Data:
 		if Data.indentify == 'desktop':
 			for s in setup_list:
 				
-				Data.run(s,prcnt_setup,epochs,False)
+				Data.train(s,prcnt_setup,epochs,False)
 			if datetime.datetime.now().weekday() == 4:
 				Data.backup()
 
@@ -331,20 +330,21 @@ class Data:
 				setups.append(s)
 		return setups
 
-	def score(dfs,ticker_list,setup_type,model = None,threshold = None):
-		if model == None: model = load_model('C:/Stocks/sync/models/model_'+ setup_type)
-		x,y= Data.format(dfs,setup_type,False)
-		sys.stdout = open(os.devnull, 'w')
-		scores = model.predict(x)
-		sys.stdout = sys.__stdout__
-		scores = scores[:,1]
+	def score(dfs,setup_type,threshold = 0,model = None):
+		if not isinstance(dfs, list):dfs = [dfs]
+		if model == None: model = load_model('C:/Stocks/sync/models/model_' + str(setup_type))
 		setups = []
-		for i in range(len(scores)):
-			score = scores[i]
-			if score >= threshold:
-				df = dfs[i]
-				ticker = ticker_list[i]
-				setups.append([ticker,score, df])
+		for df in dfs:
+			x,y= Data.format(dfs,setup_type,False)
+			sys.stdout = open(os.devnull, 'w')
+			scores = model.predict(x)
+			sys.stdout = sys.__stdout__
+			scores = scores[:,1]
+			for i in range(len(scores)):
+				score = scores[i]
+				if score > threshold:
+					ticker = df.iloc[0]['ticker']
+					setups.append([ticker,score,df[:i + 1]])
 		return setups
 		
 	def worker(bar):
@@ -360,11 +360,8 @@ class Data:
 			return df
 		def get_lagged_returns(df: pd.DataFrame, sample_size) -> pd.DataFrame:
 			FEAT_COLS = ['open', 'low', 'high', 'close']
-			#FEAT_COLS = ['open', 'low', 'high', 'close','volume']
 			for col in FEAT_COLS:
-				#return_col = df[col]/df[col].shift(1)-1
 				return_col = df[col]/df['close'].shift(1)  - 1
-				#return_col = df[col].div(close) - 1
 				df = time_series(df, return_col, f'feat_{col}_ret', sample_size)
 			return df
 		setup_type = bar[1]
@@ -377,23 +374,23 @@ class Data:
 			df = Data.get(ticker,tf,date,sample_size + 1)
 		except :
 			df = bar[0]
-			df = df[-(sample_size + 1):]
 			value = 0
 		if df.empty:
 			return
-		open_price = df.iat[-1,0]
-		for i in range(1,4):
-			df.iat[-1,i] = open_price
 		if len(df) < sample_size + 1:
 			add = pd.DataFrame(df.iat[-1,3], index=np.arange(sample_size - len(df) + 1), columns=df.columns)
 			df = pd.concat([add,df])
+		if len(df) > sample_size + 1:
+			add = pd.DataFrame(df.iat[-1,3], index=np.arange(sample_size ), columns=df.columns)
+			df = pd.concat([add,df])
 		df = get_lagged_returns(df, sample_size)
-			
+		for col in ['high','low','close']: df[f'feat_{col}_ret_t-{sample_size - 1}'] = df[f'feat_open_ret_t-{sample_size-1}'] #make last high low close the same as open so no hinsdight
+
 		df = get_classification(df,value)
 		df = df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification']]
 		return  df
 
-	def format(setups, setup_type,pool = True):
+	def format(setups, setup_type,nodes = True):
 		def reshape_x(x: np.array,FEAT_LENGTH) -> np.array:
 			num_feats = x.shape[1]//FEAT_LENGTH
 			x_reshaped = np.zeros((x.shape[0], FEAT_LENGTH, num_feats))
@@ -410,11 +407,12 @@ class Data:
 		else:
 			for df in setups:
 				arglist.append([df,setup_type])
-		if pool: dfs = Data.pool(Data.worker,arglist)
+		if nodes: dfs = Data.pool(Data.worker,arglist)
 		else: dfs = [Data.worker(arglist[i]) for i in range(len(arglist))]
 		values = pd.concat(dfs).values
 		y = values[:,-1]
-		x = reshape_x(values[:,:-1],Data.setup_size(setup_type))
+		x_values = values[:,:-1]
+		x = reshape_x(x_values,Data.setup_size(setup_type))
 		return x , y
 	
 	def setup_size(setup_type):
@@ -479,18 +477,23 @@ class Data:
 		model.save('C:/Stocks/sync/models/model_' + setup_type)
 
 	def get_config(name):
-		s  = open("C:/Stocks/scale.txt", "r").read()
+		s  = open("C:/Stocks/config.txt", "r").read()
+		trait = name.split(' ')[1]
+		trait.replace(' ','')
 		bars = s.split('-')
 		for bar in bars:
 			if name.split(' ')[0] in bar: break
 		lines = bar.splitlines()
-
 		for line in lines:
-			if name.split(' ')[1] in line: break
-		return float(line.split('=')[1].replace(' ',''))
+			if trait in line: break
+		value = line.split('=')[1].replace(' ','')
+		try: value = float(value)
+		except: pass
+		return value
+
 if __name__ == '__main__':
-	#Data.update()
-	Data.consolidate_setups()
+	Data.run()
+	#Data.consolidate_setups()
 
 
 

@@ -6,8 +6,13 @@ import os
 
 
 #print(data.get_scale('Account fw'))
-print(data.get('NFLX','1min',datetime.datetime.now()))
+df = pd.read_feather('C:/Stocks/sync/files/full_scan.feather')
+print(df)
+print(df[:-0])
+print(df[:-1])
 
+#df.rename(columns={'date':'datetime','req':'required','setup':'value'}, inplace = True)
+#df.to_feather('C:/Stocks/sync/database/aj_d_EP.feather')
 #path = "C:/Stocks/sync/database/"
 #dir_list = os.listdir(path)
 #for p in dir_list:

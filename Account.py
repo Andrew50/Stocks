@@ -4,6 +4,9 @@
 #filter out non used logs of used ticker to speed up recalc traits
 
 
+#created self.queued changes which is all changes to log so that u can do tons of logs changes before it calcs isntead of one at a time
+
+
 #periodic pnl plot
 
 from Data import Data as data
@@ -506,7 +509,7 @@ class Traits:
 
 
 
-        #    size = (data.get_scale('Traits fw')*data.get_scale('Traits fs'),data.get_scal('Traits fh')*data.get_scale('Traits fs'))
+        #    size = (data.get_config('Traits fw')*data.get_config('Traits fs'),data.get_scal('Traits fh')*data.get_config('Traits fs'))
         #    if c == 0:
         #        return
         #    plt.clf()
@@ -605,7 +608,7 @@ class Traits:
 
         if self.init:
             self.init = False
-            scale = data.get_scale('Traits ui')
+            scale = data.get_config('Traits ui')
             rolling_traits_header = ['Date','Avg Gain','Avg Loss','Win %','Risk %','Size a','Trades','PnL a']
             biggest_trades_header = ['Rank','Ticker  ','% Account']
             setup_traits_header = ['Setup','Avg Gain','Avg Loss','Win %','Risk %','Size a','Trades','PnL a']
@@ -666,8 +669,8 @@ class Account:
         s  = mpf.make_mpf_style(marketcolors=mc)
         string1 = "pnl.png"
         p1 = pathlib.Path("C:/Stocks/local/account") / string1
-        _,_ = mpf.plot(df, type='candle', volume=True, style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_scale('Account fw'),data.get_scale('Account fh')),figscale=data.get_scale('Account fs'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
-        plt.savefig(p1, bbox_inches='tight',dpi = data.get_scale('Account dpi'))
+        _,_ = mpf.plot(df, type='candle', volume=True, style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config('Account fw'),data.get_config('Account fh')),figscale=data.get_config('Account fs'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
+        plt.savefig(p1, bbox_inches='tight',dpi = data.get_config('Account dpi'))
         bio1 = io.BytesIO()
         image1 = Image.open(r"C:\Stocks\local\account\pnl.png")
         image1.save(bio1, format="PNG")
@@ -930,10 +933,10 @@ class Plot:
             tflist = ['1min','h','d']
             mc = mpf.make_marketcolors(up='g',down='r')
             s  = mpf.make_mpf_style(marketcolors=mc)
-            fs = data.get_scale('Plot fs')
-            fw = data.get_scale('Plot fw')
-            fh = data.get_scale('Plot fh')
-            dpi = data.get_scale('Plot dpi')
+            fs = data.get_config('Plot fs')
+            fw = data.get_config('Plot fw')
+            fh = data.get_config('Plot fh')
+            dpi = data.get_config('Plot dpi')
             for tf in tflist:
                 string1 = str(i) + str(tf) + ".png"
                 p1 = pathlib.Path("C:/Screener/tmp/pnl/charts") / string1

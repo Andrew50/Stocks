@@ -25,12 +25,12 @@ class Study:
             'd_EP':['true EP','range EP','low EP','volume EP','other EP'],
             'd_NEP':['backside NEP','range NEP','pivot NEP','high NEP', 'other NEP'],
             'd_F':['bull F','breakdown F','other F'],
-            'd_NF':['bear F','breakout NF''other F'],
+            'd_NF':['bear F','breakout NF','other F'],
             'd_MR':['nep MR','straight MR','parabolic MR','extended MR','other MR'],
             'd_PS':['microcap PS','largecap PS','other PS'],
             'd_P':['strong P','weak P','range P','pocket P','other P'],
             'd_NP':['strong NP','weak NP','range NP','other P']}
-        with Pool(data.get_nodes()) as self.pool:
+        with Pool(int(data.get_config('Data cpu_cores'))) as self.pool:
             self.current = current
             self.init = True
             self.previ = None
@@ -38,8 +38,14 @@ class Study:
             while True:
                 self.event, self.values = self.window.read()
                 if self.event == 'Yes' or self.event == 'No':
+                    if self.event == 'Yes': val = 1
+                    else: val = 0
                     self.event = 'Next'
-                    data.add_setup(ticker,date,setup)
+                    bar = self.setups_data.iloc[self.i]
+                    ticker = bar['ticker']
+                    date = bar['datetime']
+                    setup = bar['setup']
+                    data.add_setup(ticker,date,setup,val,1)
                 if self.event == 'Next' and (self.i < len(self.setups_data) - 1 or ((self.i < len(self.setups_data) + .5) and not self.current)): 
                     self.previ = self.i
                     if current: self.i += 1
@@ -92,7 +98,7 @@ class Study:
                                 if trait not in scan.columns or len(r) == 1:
                                     raise TimeoutError
                                 val = r[1]
-                                if trait == 'annotation':
+                                if 'annotation' in trait:
                                     df = scan[scan[trait].str.contrains(val)]
                                 else:
                                     df = scan[scan[trait] == val]
@@ -140,11 +146,6 @@ class Study:
             intraday == True
             if tf == '1min': tf_list = ['d','h','5min','1min']
             else: tf_list = ['d','h',tf,'1min']
-
-        fs = data.get_scale('Study fs')
-        fw = data.get_scale('Study fw')
-        fh = data.get_scale('Study fh')
-        dpi = data.get_scale('Study dpi')
         plt.rcParams.update({'font.size': 30})
         mc = mpf.make_marketcolors(up='g',down='r')
         s  = mpf.make_mpf_style(marketcolors=mc)
@@ -178,12 +179,12 @@ class Study:
                         df.iat[-1,4] = first_minute_volume
                 if (current or revealed) and ii == 1: title = f'{ticker} {setup} {z} {tf}' 
                 else: title = str(tf)
-                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[date], alpha = .25))
-                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (fw,fh),figscale=fs, panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
+                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[date], alpha = .25))
+                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
                 ax = axlist[0]
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
-                plt.savefig(p, bbox_inches='tight',dpi = dpi)
+                plt.savefig(p, bbox_inches='tight',dpi = data.get_config('Study chart_dpi'))
             except TimeoutError:
                 shutil.copy(r"C:\Stocks\sync\files\blank.png",p)
             ii -= 1
@@ -191,8 +192,6 @@ class Study:
     def update(self):
         if self.init:
             sg.theme('DarkGrey')
-            if data.identify() == 'tae': scale = 1.1
-            else: scale = 2.5
             layout = [  
             [sg.Image(key = '-IMAGE1-'),sg.Image(key = '-IMAGE2-')],
             [sg.Image(key = '-IMAGE3-'),sg.Image(key = '-IMAGE4-')],
@@ -203,7 +202,7 @@ class Study:
                 layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],
                 [sg.Combo([],key = '-sub_setup-', size = (20,10))],
                 [sg.Button('Prev'), sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_sort-')]]
-            self.window = sg.Window('Study', layout,margins = (10,10),finalize = True)
+            self.window = sg.Window('Study', layout,margins = (10,10),scaling = data.get_config('Study ui_scale'),finalize = True)
             self.init = False
         for i in range(1,5):
             while True:
