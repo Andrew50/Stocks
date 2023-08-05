@@ -43,7 +43,7 @@ class Data:
 		if ident == None: ident = Data.get_config('Data identity') + '_'
 		path = 'C:/Stocks/sync/database/' + ident + setup + '.feather'
 		try: df = pd.read_feather(path)
-		except TimeoutError: df = pd.DataFrame()
+		except FileNotFoundError: df = pd.DataFrame()
 		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','datetime'],keep = 'last').reset_index(drop = True)
 		df.to_feather(path)
 
@@ -509,11 +509,20 @@ class Data:
 		try: value = float(value)
 		except: pass
 		return value
-	def get_requirements(ticker, df, setupType = None):
-		def setup_requirements(setupType):
+	def get_requirements(ticker, df, tf, setupType = None):
+		def setup_requirements(tf, setupType):
 			reqDolVol = 8000000
 			reqAdr = 3
 			reqpmDolVol = 1000000
+			if 'h' in tf:
+				reqAdr = 2.5
+				reqDolVol = 2500000
+				reqpmDolVol = 1000000
+			if '1min' in tf:
+				reqAdr = 0
+				reqDolVol = 10000
+				reqpmDolVol = 1000000
+
 
 			return reqDolVol, reqAdr, reqpmDolVol
 		currentday = -1
@@ -544,7 +553,7 @@ class Data:
 			pmDolVol = pmvol * pmprice
 		else:
 			pmDolVol = 0
-		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(setupType)
+		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(tf, setupType)
 		if((adr > reqAdr) and ((dolVol > reqDolVol) or (pmDolVol > reqpmDolVol))):
 			return True
 		return False

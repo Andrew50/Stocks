@@ -30,7 +30,7 @@ class Trainer:
 			self.full_setup_list = data.get_setups_list()
 			self.chart_edge_size = data.get_config('Trainer chart_edge_size')
 			self.current_menu = 'Trainer'
-			self.sub_preload_amount = 5
+			self.sub_preload_amount = 10
 			self.trainer_cutoff = 60
 			self.selected_trainer_index = 0
 			self.current_setup = self.full_setup_list[0]
@@ -187,6 +187,7 @@ class Trainer:
 			except: AttributeError
 			self.chart_info = []
 			self.i = 0
+			self.chart_edge_size = data.get_config('Trainer chart_edge_size')
 			if os.path.exists('C:/Stocks/local/trainer/charts'):
 				shutil.rmtree('C:/Stocks/local/trainer/charts')
 			os.mkdir('C:/Stocks/local/trainer/charts')
@@ -279,13 +280,8 @@ class Trainer:
 							left = index - 300
 							if left < 0:left = 0
 							df = df[left:index + 1]
-							dolVol, adr, pmvol = screener.get_requirements(df,len(df) - 1,2,ticker)
-							if self.current_tf == 'h':
-								if dolVol > 2000000:
-									break
-							else:
-								if dolVol > 5000000:
-									break
+							if(data.get_requirements(ticker, df, self.current_tf, self.current_setup)):
+								break
 						except TimeoutError as e:
 							pass
 					title = ''
