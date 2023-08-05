@@ -1,6 +1,4 @@
 
-#automatically add typed in custom sub setup to sub setup list
-#retype
 import PySimpleGUI as sg
 import os 
 import pandas as pd
@@ -21,19 +19,18 @@ class Study:
 
     def run(self,current = False):
         self.preload_amount = 10
-        self.sub_setups_list = {
-            'd_EP':['true EP','range EP','low EP','volume EP','other EP'],
-            'd_NEP':['backside NEP','range NEP','pivot NEP','high NEP', 'other NEP'],
-            'd_F':['bull F','breakdown F','other F'],
-            'd_NF':['bear F','breakout NF','other F'],
-            'd_MR':['nep MR','straight MR','parabolic MR','extended MR','other MR'],
-            'd_PS':['microcap PS','largecap PS','other PS'],
-            'd_P':['strong P','weak P','range P','pocket P','other P'],
-            'd_NP':['strong NP','weak NP','range NP','other P']}
+        if not current:
+            self.sub_setup_list = {}
+            setup_list = data.get_setups_list()
+            scan = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+            for setup in setup_list:
+                df = scan[scan['setup'] == setup]
+                sub_setups = [*set(df['sub_setup'].to_list())]
+                add = {setup:[s for s in sub_setups if s != setup]}
+                self.sub_setup_list.update(add)
         with Pool(int(data.get_config('Data cpu_cores'))) as self.pool:
             self.current = current
             self.init = True
-            self.previ = None
             self.lookup(self)
             while True:
                 self.event, self.values = self.window.read()
@@ -60,8 +57,7 @@ class Study:
                     self.update(self)
                 elif self.event == 'Load':
                     self.previ = self.i
-                    self.update(self) #save the annotation before lookup
-                    self.previ = self.i
+                    self.update(self)
                     self.lookup(self)
                 if self.event == sg.WIN_CLOSED:
                     self.window.close()
@@ -72,7 +68,7 @@ class Study:
             else: index_list = [i/2 for i in range(self.preload_amount*2)]
         else: index_list = [self.preload_amount + self.i - 1]
         arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
-        self.pool.map(self.plot,arglist)
+        self.pool.map_async(self.plot,arglist)
         
     def lookup(self):
         try:
@@ -100,7 +96,7 @@ class Study:
                                         raise TimeoutError
                                     val = r[1]
                                     if 'annotation' in trait:
-                                        df = scan[scan[trait].str.contrains(val)]
+                                        df = scan[scan[trait].str.contains(val)]
                                     else:
                                         df = scan[scan[trait] == val]
                                     dfs.append(df)
@@ -114,6 +110,7 @@ class Study:
         else:
             self.setups_data = scan
             self.i = 0.0
+            self.previ = None
             if os.path.exists("C:/Stocks/local/study/charts"):
                 while True:
                     try:
@@ -127,9 +124,7 @@ class Study:
 
     def plot(bar):
         setups_data = bar[0]
-        print(setups_data)
         i = bar[1]
-        #print(i)
         if int(i) != i: revealed = True
         else: revealed = False
         current = bar[2]
@@ -222,6 +217,8 @@ class Study:
                 df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
                 annotation = self.values["-annotation-"]
                 sub_setup = self.values['-sub_setup-']
+                setup = self.setups_data.iloc[math.floor(self.i)]['setup']
+                if sub_setup != setup and sub_setup not in self.sub_setup_list[setup]: self.sub_setup_list[setup].append(sub_setup)
                 if int(self.previ) == self.previ: col = 'pre_annotation'
                 else: col = 'post_annotation'
                 index = self.setups_data.index[math.floor(self.previ)]
@@ -234,7 +231,7 @@ class Study:
             else: col = 'post_annotation'
             bar = self.setups_data.iloc[math.floor(self.i)]
             self.window["-annotation-"].update(bar[col])
-            ss = list(self.sub_setups_list[bar['setup']])
+            ss = list(self.sub_setup_list[bar['setup']])
             self.window['-sub_setup-'].update(values = ss, value = bar['sub_setup'])
         self.window.maximize()
 

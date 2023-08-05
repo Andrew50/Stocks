@@ -1,16 +1,3 @@
-
-
-
-
-#screen for histrocial setups every night if unmarked less than 500 or something
-
-
-#allow no interent functionality
-
-
-
-
-
 import numpy as np
 from typing import Tuple
 from matplotlib import pyplot as plt
@@ -23,6 +10,7 @@ import sys
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import pandas as pd
+import websocket
 import datetime
 from tvDatafeed import TvDatafeed, Interval
 import os
@@ -67,7 +55,7 @@ class Data:
 		data = list(tqdm(pool.imap_unordered(deff, arg), total=len(arg))) #might need to be imap
 		return data
 
-	def format_date(dt):
+	def format_date(dt,tf  = '1min'):
 		if type(dt) == str:
 			try: dt = datetime.datetime.strptime(dt, '%Y-%m-%d')
 			except: dt = datetime.datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
@@ -77,14 +65,16 @@ class Data:
 		if dt.time() == datetime.time(0):
 			time = datetime.time(9,30,0)
 			dt = datetime.datetime.combine(dt.date(),time)
+
+		df = pd.DataFrame({'datetime':[dt],'god':[3]}).set_index('datetime').resample(tf).apply({'god' : 'first'})
+		if 'd' in tf or 'w' in tf: df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
+		dt = df.index[-1]
+
 		return(dt)
 
 	def findex(df,dt):
 		dt = Data.format_date(dt)
 		
-		if df.index[0] > dt:
-			print(f"Date {dt} is before dataframe")
-			return 0 
 		i = int(len(df)/2)
 		k = i
 		while True:
@@ -138,15 +128,18 @@ class Data:
 			add = add[add_index:]
 			return pd.concat([df,add])
 		df = feather.read_feather(Data.data_path(ticker,tf))
-		
 		if dt != None:
 			dt = Data.format_date(dt)
 			adj_dt = adjust_date(dt,tf) #round date to nearest non premarket datetime
 			try:  
 				index = Data.findex(df,adj_dt)
 			except IndexError: 
-				df = append_tv(ticker,tf,df,False)
-				index = Data.findex(df,adj_dt)
+				try:
+					df = append_tv(ticker,tf,df,False)
+					index = Data.findex(df,adj_dt)
+				except websocket._exceptions.WebSocketAddressException: #no internet
+					print('no internet')
+					index = len(df) - 1
 			if offset == 0: df = df[:index + 1]
 			if dt.hour < 5 or (dt.hour == 5 and dt.minute < 30):  ####if date requested is premarket
 				if 'd' in tf or 'w' in tf:
@@ -165,13 +158,11 @@ class Data:
 		if 'h' in tf: df.index = df.index + pd.Timedelta(minutes = -30)
 		if tf != '1min' and tf != 'd':
 			df = df.resample(tf).apply({'open'  : 'first', 'high'  : 'max', 'low':'min', 'close' : 'last', 'volume': 'sum' })
-			
 		if 'h' in tf: df.index = df.index + pd.Timedelta(minutes = 30)
 		elif 'w' in tf: 
 			df = pd.concat([df,last_bar])
 		if 'd' in tf or 'w' in tf:
 			df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
-
 		if offset != 0: df = df[:Data.findex(df,dt)+offset]
 		if 'd' not in tf and 'w' not in tf: df = df.between_time('09:30' , '15:59')
 		df = df.dropna()
@@ -248,7 +239,6 @@ class Data:
 		prcnt_setup = .05
 		if Data.get_config("Data identity") == 'desktop':
 			for s in setup_list:
-				
 				Data.train(s,prcnt_setup,epochs,False)
 			if datetime.datetime.now().weekday() == 4:
 				Data.backup()
