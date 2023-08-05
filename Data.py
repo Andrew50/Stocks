@@ -31,7 +31,7 @@ class Data:
 		if ident == None: ident = Data.get_config('Data identity') + '_'
 		path = 'C:/Stocks/sync/database/' + ident + setup + '.feather'
 		try: df = pd.read_feather(path)
-		except TimeoutError: df = pd.DataFrame()
+		except FileNotFoundError: df = pd.DataFrame()
 		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','datetime'],keep = 'last').reset_index(drop = True)
 		df.to_feather(path)
 
@@ -237,6 +237,19 @@ class Data:
 		Data.combine_training_data()
 		epochs = 200
 		prcnt_setup = .05
+		historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"):
+			shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+		while(len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
+			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+			print(len(historical_setups[historical_setups["post_annotation"] == ""]))
+			full_list_minus_annotation = full_list_minus_annotation.sample(frac=1)
+			for t in range(8):
+				screener.run(ticker=full_list_minus_annotation.iloc[t]["Ticker"], fpath=0)
+			full_list_minus_annotation = full_list_minus_annotation[8:].reset_index(drop=True)
+			full_list_minus_annotation.to_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+			
+
 		if Data.get_config("Data identity") == 'desktop':
 			for s in setup_list:
 				Data.train(s,prcnt_setup,epochs,False)
@@ -339,8 +352,7 @@ class Data:
 				if score > threshold:
 					ticker = df.iloc[0]['ticker']
 					d = df[:i + 1]
-					if(Data.get_requirements(d) == True):
-						print(d)
+					if(Data.get_requirements(ticker, d) == True):
 						setups.append([ticker,score,d])
 		return setups
 		
@@ -487,14 +499,22 @@ class Data:
 		try: value = float(value)
 		except: pass
 		return value
-	def get_requirements(df, setupType = None):
-		def setup_requirements(setupType):
+	def get_requirements(ticker, df, tf, setupType = None):
+		def setup_requirements(tf, setupType):
 			reqDolVol = 8000000
 			reqAdr = 3
 			reqpmDolVol = 1000000
+			if 'h' in tf:
+				reqAdr = 2.5
+				reqDolVol = 2500000
+				reqpmDolVol = 1000000
+			if '1min' in tf:
+				reqAdr = 0
+				reqDolVol = 10000
+				reqpmDolVol = 1000000
+
 
 			return reqDolVol, reqAdr, reqpmDolVol
-		print(df)
 		currentday = -1
 		length = len(df)
 		if length < 5:
@@ -516,13 +536,14 @@ class Data:
 			val = (high/low - 1) * 100
 			adr.append(val)
 		adr = statistics.mean(adr)  
+		from Screener import Screener as screener
 		if	dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
-			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
+			pmvol = screener.get('current').loc[ticker]['Pre-market Volume']
 			pmprice = df.iat[currentday,0]
 			pmDolVol = pmvol * pmprice
 		else:
 			pmDolVol = 0
-		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(setupType)
+		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(tf, setupType)
 		if((adr > reqAdr) and ((dolVol > reqDolVol) or (pmDolVol > reqpmDolVol))):
 			return True
 		return False
