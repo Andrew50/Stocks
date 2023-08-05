@@ -248,16 +248,15 @@ class Data:
 		prcnt_setup = .05
 		historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"):
-			shutil.copyfile("C:\Stocks\sync\files\full_scan.feather", "C:\Stocks\local\study\full_list_minus_annotated.feather")
-		
-		import Screener as screener
+			shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
 		while(len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
 			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+			print(len(historical_setups[historical_setups["post_annotation"] == ""]))
 			full_list_minus_annotation = full_list_minus_annotation.sample(frac=1)
 			for t in range(8):
-				screener.run(ticker=full_list_minus_annotation.iloc['Ticker'][t], fpath=0)
-			full_list_minus_annotation = full_list_minus_annotation[8:]
-			full_list_minus_annotation.to_feather("C:\Stocks\local\study\full_list_minus_annotated.feather")
+				screener.run(ticker=full_list_minus_annotation.iloc[t]["Ticker"], fpath=0)
+			full_list_minus_annotation = full_list_minus_annotation[8:].reset_index(drop=True)
+			full_list_minus_annotation.to_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
 			
 
 		if Data.get_config("Data identity") == 'desktop':
@@ -363,8 +362,7 @@ class Data:
 				if score > threshold:
 					ticker = df.iloc[0]['ticker']
 					d = df[:i + 1]
-					if(Data.get_requirements(d) == True):
-						print(d)
+					if(Data.get_requirements(ticker, d) == True):
 						setups.append([ticker,score,d])
 		return setups
 		
@@ -511,14 +509,13 @@ class Data:
 		try: value = float(value)
 		except: pass
 		return value
-	def get_requirements(df, setupType = None):
+	def get_requirements(ticker, df, setupType = None):
 		def setup_requirements(setupType):
 			reqDolVol = 8000000
 			reqAdr = 3
 			reqpmDolVol = 1000000
 
 			return reqDolVol, reqAdr, reqpmDolVol
-		print(df)
 		currentday = -1
 		length = len(df)
 		if length < 5:
@@ -540,8 +537,9 @@ class Data:
 			val = (high/low - 1) * 100
 			adr.append(val)
 		adr = statistics.mean(adr)  
+		from Screener import Screener as screener
 		if	dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
-			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
+			pmvol = screener.get('current').loc[ticker]['Pre-market Volume']
 			pmprice = df.iat[currentday,0]
 			pmDolVol = pmvol * pmprice
 		else:
