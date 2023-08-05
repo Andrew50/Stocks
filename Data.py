@@ -246,6 +246,17 @@ class Data:
 		Data.combine_training_data()
 		epochs = 200
 		prcnt_setup = .05
+		historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"):
+			shutil.copyfile("C:\Stocks\sync\files\full_scan.feather", "C:\Stocks\local\study\full_list_minus_annotated.feather")
+		full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+		full_list_minus_annotation = full_list_minus_annotation.sample(frac=1)
+		import Screener as screener
+		while(len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
+			screener.run(ticker=full_list_minus_annotation.iloc['Ticker'][0], fpath=0)
+			full_list_minus_annotation = full_list_minus_annotation[1:]
+			
+
 		if Data.get_config("Data identity") == 'desktop':
 			for s in setup_list:
 				
