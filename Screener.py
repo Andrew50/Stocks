@@ -56,8 +56,7 @@ class Screener:
 		date = container[1]
 		tf = container[2]
 		path = container[3]
-		setup_list = ['d_EP']
-		#setup_list = ['d_EP','d_NEP','d_P', 'd_F', 'd_MR', 'd_NP','d_NF']
+		setup_list = data.get_config('Screener active_setup_list').split(',')
 		setup_list = [s for s in setup_list if tf in s]
 		threshold = .25
 		dfs = []

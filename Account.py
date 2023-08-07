@@ -74,7 +74,7 @@ class Run:
 class Log:
 
     def recalc(self,updated_log):
-        new_log = pd.concat([self.df_log, updated_log]).drop_duplicates(keep=False).sort_values(by='datetime', ascending = False)
+        new_log = pd.concat([self.df_log[self.df_log['ticker'] != 'Deposit'], updated_log]).drop_duplicates(keep=False).sort_values(by='datetime', ascending = False)
         self.df_log = updated_log.sort_values(by='datetime', ascending = False).reset_index(drop = True)
         self.queued_recalcs = pd.concat([self.queued_recalcs,new_log]).reset_index(drop = True)
         self.queued_recalcs.to_feather('C:/Stocks/local/account/queued_recalcs.feather')
@@ -159,12 +159,13 @@ class Log:
         self.window.maximize()
     
     def pull(self):
-        ident = data.identify()
-        if ident == 'desktop':
+        ident = data.get_config('Data identity')
+        print(ident)
+        if ident == 'desktop' or ident == 'laptop':
             host = "imap.gmail.com"
             username = "billingsandrewjohn@gmail.com"
             password = 'kqnrpkqscmvkrrnm'
-            download_folder = "C:/Screener/tmp/pnl"
+            download_folder = "C:/Stocks/local/account"
             if not os.path.isdir(download_folder):
                 os.makedirs(download_folder, exist_ok=True)
             mail = Imbox(host, username=username, password=password, ssl=True, ssl_context=None, starttls=False)
@@ -179,16 +180,18 @@ class Log:
                         with open(download_path, "wb") as fp:
                             fp.write(attachment.get('content').read())
             mail.logout()
-            log = pd.read_csv('C:/Screener/tmp/pnl/Webull_Orders_Records.csv')
+            log = pd.read_csv(download_folder + '/Webull_Orders_Records.csv')
             log2 = pd.DataFrame()
             log2['ticker'] = log['Symbol']
-            log2['datetime']  = pd.to_datetime(log['Filled Time'])
-            log2['shares'] = log['Filled']
+            log2['datetime']  = pd.to_datetime(log['Placed Time'])
+            log2['shares'] = log['Total Qty']
+            log2['filled'] = log['Filled']
             for i in range(len(log)):
                 if log.at[i,'Side'] != 'Buy':
                     log2.at[i,'shares'] *= -1
             log2['price'] = log['Avg Price']
             log2['setup'] = ''
+            print(log2)
             log2 = log2.dropna()
             log2 = log2[(log2['datetime'] > '2021-12-01')]
             log2 = log2.sort_values(by='datetime', ascending = False).reset_index(drop = True)
@@ -231,7 +234,7 @@ class Log:
             updated_log =  dfn
         else:
             raise Exception('no pull method created')
-        Log.recalc(self,updated_log)
+        #Log.recalc(self,updated_log)
 
 
 class Traits:
@@ -969,64 +972,5 @@ class Plot:
 if __name__ == '__main__':
     Run.run(Run)
 
-
-
-
-    
-        #startdate = data.format_date(new_log.index[-1])
-        #conct = True
-        #if startdate == None:
-        #    conct = False
-        #account = True
-        #if startdate != 'now' and startdate != None and startdate > df_aapl.index[-1]:
-        #    return df_pnl
-        #if startdate != None:
-        #    if startdate == 'now':
-        #        df_pnl = df_pnl[:-1]
-        #        startdate = df_pnl.index[-1]
-        #        index = -1
-        #    else:
-        #        del_index = data.findex(df_pnl,startdate) 
-        #        df_pnl = df_pnl[:del_index]
-        #        index = data.findex(df_pnl,startdate)
-        #    if index == None or index >= len(df_pnl):
-        #        index = -1
-        #    bar = df_pnl.iloc[index]
-        #    pnl = bar['close']
-        #    deposits = bar['deposits']
-        #    positions = bar['positions'].split(',')
-        #    shares = bar['shares'].split(',')
-        #    pos = []
-        #    for i in range(len(shares)):
-        #        ticker = positions[i]
-        #        if ticker != '':
-        #            share = float(shares[i])
-        #            df = data.get(ticker,'1min',account = account)
-        #            pos.append([ticker,share,df])
-        #    gud = df_log.set_index('datetime')
-        #    log_index = data.findex(gud,startdate) 
-        #    if log_index != None and log_index < len(df_log):
-        #        nex = df_log.iloc[log_index]['datetime']
-        #    else:
-        #        nex = datetime.datetime.now() + datetime.timedelta(days = 100)
-        #    if nex < startdate:
-        #        try:
-        #            log_index += 1
-        #            nex = df_log.iloc[log_index]['datetime']
-        #        except:
-        #            nex = datetime.datetime.now() + datetime.timedelta(days = 100)
-        #else:
-        #    startdate = df_log.iat[0,1] - datetime.timedelta(days = 1)
-        #    pnl = 0
-        #    deposits = 0
-        #    pos = []
-        #    index = 0
-        #    log_index = 0
-        #    nex = df_log.iat[0,1]
-        #start_index = data.findex(df_aapl,startdate)
-        #prev_date = df_aapl.index[start_index - 1]
-        #date_list = df_aapl[start_index:].index.to_list()
-        #df_list = []
-        #pbar = tqdm(total=len(date_list))
 
 
