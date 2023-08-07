@@ -247,7 +247,7 @@ class Screener:
 
 if __name__ == '__main__':
 	
-	Screener.run(ticker='COIN', fpath=0)
+	Screener.run(datetime.datetime.now())
 	'''if   ((datetime.datetime.now().hour) < 5 or (datetime.datetime.now().hour == 5 and datetime.datetime.now().minute < 40)) and not data.identify == 'laptop':
 		Screener.run(datetime.datetime.now())
 		study.current(study,True)
