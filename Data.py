@@ -87,6 +87,8 @@ class Data:
 			if df.index[i].to_pydatetime() < dt: i += 1
 			else: break
 		while True:
+			if i < 0:
+				raise IndexError
 			if df.index[i].to_pydatetime() > dt: i -= 1
 			else: break
 		return i
@@ -117,17 +119,20 @@ class Data:
 			if 'h' in tf: dt += datetime.timedelta(minutes = 30)
 			return dt
 		def append_tv(ticker,tf,df,pm):
-			exchange = pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('Ticker').loc[ticker]['Exchange']
+			try: exchange = pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('Ticker').loc[ticker]['Exchange']
+			except KeyError: raise TimeoutError()
 			if not ('d' in tf or 'w' in tf): interval = Interval.in_1_minute
 			else: interval = Interval.in_daily
 			tv = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1")
 			add = tv.get_hist(ticker, exchange, interval=interval, n_bars=100000, extended_session = pm)
 			add.drop('symbol', axis = 1, inplace = True)
 			add.index = add.index + pd.Timedelta(hours=4)
+			if add.index[0] > df.index[-1]: return add
 			add_index = Data.findex(add,df.index[-1]) + 1
 			add = add[add_index:]
 			return pd.concat([df,add])
-		df = feather.read_feather(Data.data_path(ticker,tf))
+		try: df = feather.read_feather(Data.data_path(ticker,tf))
+		except FileNotFoundError: df = pd.DataFrame()
 		if dt != None:
 			dt = Data.format_date(dt)
 			adj_dt = adjust_date(dt,tf) #round date to nearest non premarket datetime
@@ -136,9 +141,15 @@ class Data:
 			except IndexError: 
 				try:
 					df = append_tv(ticker,tf,df,False)
+					if dt < df.index[0]: return pd.DataFrame()
+
 					index = Data.findex(df,adj_dt)
-				except websocket._exceptions.WebSocketAddressException: #no internet
+				except websocket._exceptions.WebSocketAddressException : #no internet
 					print('no internet')
+					index = len(df) - 1
+				except TimeoutError:
+					print(f'ticker {ticker} has no data at {dt}')
+					if df.empty: return pd.DataFrame()
 					index = len(df) - 1
 			if offset == 0: df = df[:index + 1]
 			if dt.hour < 5 or (dt.hour == 5 and dt.minute < 30):  ####if date requested is premarket

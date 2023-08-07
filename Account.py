@@ -480,6 +480,7 @@ class Traits:
         df = pd.DataFrame()
         df['#'] = sorted_df.index + 1
         df['Ticker'] = sorted_df['ticker']
+        df['Date'] = sorted_df['datetime']
         df['% a'] = sorted_df['pnl a'].round(2)
         return df.values.tolist()
     
@@ -489,134 +490,33 @@ class Traits:
             self.queued_recalcs = pd.DataFrame()
             try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
             except FileNotFoundError: pass
-
-
-        elif self.event == '-table_losers-' or self.event =='-table_winners-' and len(self.values[self.event]) > 0:
-            bar = self.window[self.event].Values[self.values[self.event][0]]
-            print(bar)
-            #lookup trait bar and then pass in plot.create
-      
-
-        elif '+CLICKED+' in self.event:
-            pass
-
-
-        elif self.event == '-table_setups-':  ####in the chart
-            i = self.values['-table_setups-'][0]
-            t = self.values['-table_setups-']
-            x = [v[0] for v in t]
-
-        elif '+CLICKED+' in self.event: ###rolling traits
-            pass
-
+        elif (self.event == '-table_losers-' or self.event =='-table_winners-') and len(self.values[self.event]) > 0:
+            sorted_df = self.df_traits.sort_values(by = ['pnl a'], ascending = (self.event == '-table_winners-')).reset_index(drop = True)
+            Plot.create([self.values[self.event][0],sorted_df,True])
+        elif '+CLICKED+' in self.event and self.event[2][1] != 0:
+            table = self.window[self.event[0]].Values
+            x_labels = [b[0] for b in table]
+            y = [b[self.event[2][1]] for b in table]
+            x = [i + 1 for i in range(len(table))]
+            plt.clf()
+            plt.scatter(x,y)
+            if self.event[0] == '-table_rolling_traits-':
+                z = np.polyfit(x[1:], y[1:], 1)
+                p = np.poly1d(z)
+                plt.plot(x,p(x),"r--")
+                plt.xticks(x, x_labels)
+            plt.gcf().set_size_inches((data.get_config('Traits chart_size') * data.get_config('Traits chart_aspect_ratio') * 22.5,data.get_config('Traits chart_size') * 25.7))
+            string1 = "trait.png"
+            p1 = pathlib.Path("C:/Stocks/local/account") / string1
+            plt.savefig(p1,bbox_inches='tight')
         Traits.update(self)
-
-        #    c = self.event[2][1]
-
-
-
-        #    size = (data.get_config('Traits fw')*data.get_config('Traits fs'),data.get_scal('Traits fh')*data.get_config('Traits fs'))
-        #    if c == 0:
-        #        return
-        #    plt.clf()
-        #    y = [p[5] for p in self.monthly[1:] if not np.isnan(p[c])]
-        #    x = [p[c] for p in self.monthly[1:] if not np.isnan(p[c])]
-        #    plt.scatter(x,y)
-        #    z = np.polyfit(x, y, 1)
-        #    p = np.poly1d(z)
-        #    plt.plot(x,p(x),"r--")
-        #    plt.gcf().set_size_inches(size)
-        #    string1 = "traits.png"
-        #    p1 = pathlib.Path("C:/Screener/tmp/pnl") / string1
-        #    plt.savefig(p1,bbox_inches='tight')
-        #    bio1 = io.BytesIO()
-        #    image1 = Image.open(r"C:\Screener\tmp\pnl\traits.png")
-        #    image1.save(bio1, format="PNG")
-        #    self.window["-CHART-"].update(data=bio1.getvalue())
-        #elif self.event == '-table_traits-':
-        #    i = self.values['-table_traits-'][0]
-        #    inp = self.traits_table[i][0]
-        #elif self.event == '-table_gainers-' or self.event == '-table_losers-':
-        #    if self.event == '-table_gainers-':
-        #        df = self.gainers
-        #        i = self.values['-table_gainers-'][0]
-        #    else:
-        #        df = self.losers
-        #        i = self.values['-table_losers-'][0]
-        #    bar = [i,df,1]
-        #    if os.path.exists("C:/Screener/tmp/pnl/charts"):
-        #        shutil.rmtree("C:/Screener/tmp/pnl/charts")
-        #    os.mkdir("C:/Screener/tmp/pnl/charts")
-        #    Plot.create(bar)
-        #    bio1 = io.BytesIO()
-        #    image1 = Image.open(f'C:/Screener/tmp/pnl/charts/{i}d.png')
-        #    image1.save(bio1, format="PNG")
-        #    self.window["-CHART-"].update(data=bio1.getvalue())
-        #elif self.event == 'Traits':
-        #    inp = 'account'
-        #    gainers2 = self.df_traits.sort_values(by = ['pnl %'])[:10].reset_index(drop = True)
-        #    gainers = pd.DataFrame()
-        #    gainers['#'] = gainers2.index + 1
-        #    gainers['Ticker'] = gainers2['ticker']
-        #    gainers['$'] = gainers2['pnl %'].round(2)
-        #    losers2 = self.df_traits.sort_values(by = ['pnl %'] , ascending = False)[:10].reset_index(drop = True)
-        #    losers = pd.DataFrame()
-        #    losers['#'] = losers2.index + 1
-        #    losers['Ticker'] = losers2['ticker']
-        #    losers['$'] = losers2['pnl %'].round(2)
-        #    self.losers = losers2
-        #    self.gainers = gainers2
-        #    self.monthly = Traits.build_rolling_traits(self)
-        #    traits = Traits.build_traits(self)
-        #    self.window["-table_gainers-"].update(gainers.values.tolist())
-        #    self.window["-table_losers-"].update(losers.values.tolist())
-        #    self.window["-table_traits-"].update(traits)
-        #    self.window["-table_monthly-"].update(self.monthly)
-        #if inp != False:
-        #    bins = 50
-        #    if os.path.exists("C:/Screener/laptop.txt"): #if laptop
-        #        size = (49,25)
-        #    else:
-        #        size = (25,10)
-        #    if inp == "":
-        #        inp = 'p10'
-        #    try:
-        #        plt.clf()
-        #        if ':'  in inp:
-        #            inp = inp.split(':')
-        #            inp1 = inp[0]
-        #            inp2 = inp[1]
-        #            x = self.df_traits[inp1].to_list()
-        #            y = self.df_traits[inp2].to_list()
-        #            plt.scatter(x,y)
-        #            z = np.polyfit(x, y, 1)
-        #            p = np.poly1d(z)
-        #            plt.plot(x,p(x),"r--")
-        #        else:
-        #            fifty = self.df_traits[inp].dropna().to_list()
-        #            plt.hist(fifty, bins, alpha=1, ec='black',label='Percent') 
-        #        plt.gcf().set_size_inches(size)
-        #        string1 = "traits.png"
-        #        p1 = pathlib.Path("C:/Screener/tmp/pnl") / string1
-        #        plt.savefig(p1,bbox_inches='tight')
-                
-        #        bio1 = io.BytesIO()
-        #        image1 = Image.open(r"C:\Screener\tmp\pnl\traits.png")
-        #        image1.save(bio1, format="PNG")
-        #        self.window["-CHART-"].update(data=bio1.getvalue())
-        #    except:
-        #        pass
-      
-
-
-
     def update(self):
 
         if self.init:
             self.init = False
             scale = data.get_config('Traits ui')
             rolling_traits_header = ['Date  ','Avg Gain','Avg Loss','Win %','High %','Risk %','Size a','Trades','PnL a']
-            biggest_trades_header = ['Rank','Ticker ','% a']
+            biggest_trades_header = ['Rank','Ticker','Date    ','% a ']
             setup_traits_header = ['Setup','Gain','Loss','Win %','High','Risk %','Size','Trades','PnL a']
             c1 = [[sg.Table([],headings=biggest_trades_header,key = '-table_winners-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
             c2 = [[sg.Table([],headings=biggest_trades_header,key = '-table_losers-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
@@ -630,10 +530,18 @@ class Traits:
             sg.Column(c4), sg.VSeperator(),],[sg.Column(c5),sg.VSeperator(),sg.Column(c6),]]
             self.window = sg.Window(self.menu, layout,margins = (10,10),scaling=scale,finalize = True)
             self.window.maximize()
+
+
         self.window['-table_winners-'].update(Traits.build_trades_table(self,True))
         self.window['-table_losers-'].update(Traits.build_trades_table(self,False))
         self.window['-table_setups-'].update(Traits.build_setup_traits_table(self))
         self.window['-table_rolling_traits-'].update(Traits.build_rolling_traits_table(self))
+
+        if os.path.exists('C:/Stocks/local/account/trait.png'):
+            image = Image.open('C:/Stocks/local/account/trait.png')
+            bio = io.BytesIO()
+            image.save(bio, format="PNG")
+            self.window['-CHART-'].update(data = bio.getvalue())
 
 
 class Account:
@@ -824,33 +732,39 @@ class Account:
 class Plot:
 
     def sort(self):
-        scan = self.df_traits
-        sort_val = None
-        if not self.init:
-            sort = self.values['-input_sort-']
-            reqs = sort.split('&')
-            for req in reqs:
-                if '^' in req:
-                    sort_val = req.split('^')[1]
-                    if sort_val not in scan.columns:
-                        raise TimeoutError
-                else:
-                    req = req.split('|')
-                    dfs = []
-                    for r in req:
-                        r = r.split('=')
-                        trait = r[0]
-                        if trait not in scan.columns or len(r) == 1:
-                            raise TimeoutError
-                        val = r[1]
-                        if trait == 'annotation':
-                            df = scan[scan[trait].str.contrains(val)]
+        try:
+            scan = self.df_traits
+            sort_val = None
+            if not self.init:
+                sort = self.values['-input_sort-']
+                reqs = sort.split('&')
+                if sort != "":
+                    for req in reqs :
+                        if '^' in req:
+                            sort_val = req.split('^')[1]
+                            if sort_val not in scan.columns and sort_val != 'r':
+                                raise TimeoutError
                         else:
-                            df = scan[scan[trait] == val]
-                        dfs.append(df)
-                    scan = pd.concat(dfs).drop_duplicates()
-        if sort_val != None: scan = scan.sort_values(by = [sort_val], ascending = False)
-        else:scan = scan.sample(frac = 1)
+                            req = req.split('|')
+                            dfs = []
+                            for r in req:
+                                r = r.split('=')
+                                trait = r[0]
+                                if trait not in scan.columns or len(r) == 1:
+                                    raise TimeoutError
+                                val = r[1]
+                                if trait == 'annotation':
+                                    df = scan[scan[trait].str.contrains(val)]
+                                else:
+                                    df = scan[scan[trait] == val]
+                                dfs.append(df)
+                            scan = pd.concat(dfs).drop_duplicates()
+                if scan.empty: raise TimeoutError
+            if sort_val != None:
+                if sort_val == 'r': scan = scan.sample(frac = 1)
+                else: scan = scan.sort_values(by = [sort_val], ascending = False)
+            else:scan = scan.sort_values(by = 'datetime', ascending = True)
+        except TimeoutError: sg.Popup('no setups found')
         self.sorted_traits = scan
         self.i = 0
         if os.path.exists("C:/Stocks/local/account/charts"):
@@ -861,16 +775,17 @@ class Plot:
                 except:
                     pass
         os.mkdir("C:/Stocks/local/account/charts")
+        Plot.preload(self)
 
     def update(self):
         trade_headings = ['Date             ','Shares   ','Price  ']
         trait_headings = ['pnl $','pnl %','pnl a', 'high %','risk %']
         if self.init:
             Plot.sort(self)
-            Plot.preload(self)
             
-            c2 = [   [sg.Image(key = '-IMAGE3-')], [sg.Image(key = '-IMAGE1-')]]
-            c1 = [[sg.Image(key = '-IMAGE2-')],
+            
+            c2 = [   [sg.Image(key = '-IMAGE2-')], [sg.Image(key = '-IMAGE0-')]]
+            c1 = [[sg.Image(key = '-IMAGE1-')],
                 [(sg.Text(key = '-number-'))], 
                 [sg.Table([],headings = trait_headings,num_rows = 2, key = '-trait_table-',auto_size_columns=True,justification='left', expand_y = False)],
                 [sg.Table([],headings = trade_headings, key = '-trade_table-',auto_size_columns=True,justification='left',num_rows = 5, expand_y = False)],
@@ -878,47 +793,35 @@ class Plot:
                 [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
             layout = [ [sg.Column(c1), sg.VSeperator(), sg.Column(c2)],]
             self.window = sg.Window(self.menu, layout,margins = (10,10),scaling=data.get_config('Plot ui_scale'),finalize = True)
-            Plot.preload(self)
+            self.init = False
         
         bar = self.sorted_traits.iloc[self.i]
         trades = bar['trades']
         trade_table = [[datetime.datetime.strptime(trades[k][1], '%Y-%m-%d %H:%M:%S'),(float(trades[k][2])),float(trades[k][3])] for k in range(len(trades))]
-        trait_table = [bar[trait] for trait in trait_headings]
+        trait_table = [[bar[trait] for trait in trait_headings]]
         self.window["-number-"].update(str(f"{self.i + 1} of {len(self.df_traits)}"))
         self.window["-trait_table-"].update(trait_table)
         self.window["-trade_table-"].update(trade_table)
-        for i in range(1,4):
+        for i in range(3):
             while True:
                 try: 
-                    image = Image.open(f'C:\Stocks\local\study\charts\{i}{self.i}.png')
+                    image = Image.open(f'C:/Stocks/local/account/charts/{i}_{self.i}.png')
                     bio = io.BytesIO()
                     image.save(bio, format="PNG")
                     self.window[f'-IMAGE{i}-'].update(data = bio.getvalue())
-                except (PIL.UnidentifiedImageError, FileNotFoundError, OSError): pass
+                except (PIL.UnidentifiedImageError, FileNotFoundError, OSError, SyntaxError) as e: pass
                 else: break
         self.window.maximize()
 
     def preload(self):
-        helper_list = list(range(len(self.sorted_traits)))
-        if self.i == 0: index_list = [i for i in list(range(10))]
+        helper_list = list(range(len(self.sorted_traits))) + list(range(len(self.sorted_traits)))
+        if self.i == 0: index_list = [0,1,-1,2,-2,3,-3,4,-4,5,-5,6,-6,7,-7,8,-8,9,-9]
         else: index_list = [self.i + 9, self.i - 9]
+        
         index_list = [helper_list[i] for i in index_list]
         arglist = []
-        for i in index_list: arglist.append([i,self.df_traits])
-        self.pool.map(Plot.create,arglist)
-
-
-        #i = list(range(self.i,10+self.i))
-        #if self.i < 5:
-        #    i += list(range(len(self.df_traits) - 1,len(self.df_traits) - 11,-1))
-        #else:
-        #    i += list(range(self.i,self.i - self.preloadamount,-1))
-        #i = [x for x in i if x >= 0 and x < len(self.df_traits)]
-
-        #if self.i == 0:
-        #    index_list = [i for i in list(range(10))] + [i for i in list(range(len(self.sorted_traits),self.sorted_traits - 10,-1))]
-        #else:
-        #    index_list = [i
+        for i in index_list: arglist.append([i,self.sorted_traits,False])
+        self.pool.map_async(Plot.create,arglist)
 
          
 
@@ -928,134 +831,140 @@ class Plot:
         elif self.event == 'Next' :
             if self.i == len(self.df_traits) - 1: self.i = 0
             else: self.i += 1
+            Plot.preload(self)
         elif self.event == 'Prev':
             if self.i == 0: self.i = len(self.df_traits) - 1
             else: self.i -= 1
+            Plot.preload(self)
         Plot.update(self)
-        Plot.preload(self)
+
         
 
     def create(bar):
         i = bar[0]
-        if (os.path.exists(r"C:\Stocks\local\account\charts" + f"\{i}" + "1min.png") == False):
-            df = bar[1]
-            ticker = df.iat[i,0]
+        df = bar[1]
+        from_traits = bar[2]
+        if from_traits: 
+            tflist = ['d']
+            source = 'Traits'
+        else: 
+            
             tflist = ['1min','h','d']
-            mc = mpf.make_marketcolors(up='g',down='r')
-            s  = mpf.make_mpf_style(marketcolors=mc)
+            source = 'Plot'
 
-            for tf in tflist:
-                string1 = str(i) + str(tf) + ".png"
-                p1 = pathlib.Path("C:/Stocks/local/account/charts") / string1
-                datelist = []
-                colorlist = []
-                trades = []
-                for k in range(len(df.iat[i,2])):
-                    date = datetime.datetime.strptime(df.iat[i,2][k][1], '%Y-%m-%d %H:%M:%S')
-                    if tf == 'd':
-                        date = date.date()
-                    val = float(df.iat[i,2][k][2])
-                    if val > 0:
-                        colorlist.append('g')
-                        add = pd.DataFrame({
-                                'Datetime':[df.iat[i,2][k][1]], 
-                                'Symbol':[df.iat[i,2][k][0]],
-                                'Action':"Buy",
-                                'Price':[float(df.iat[i,2][k][3])]
-                                })
-                        trades.append(add)
-                    else:
-                        colorlist.append('r')
-                    datelist.append(date)
-                god = bar[1].iloc[i]['arrows']
-                god = [list(x) for x in god]
-                dfall= pd.DataFrame(god, columns=['Datetime', 'Price', 'Color', 'Marker'])
-                dfall['Datetime'] = pd.to_datetime(dfall['Datetime'])
-                dfall = dfall.sort_values('Datetime')
-                colors = []
-                dfsByColor = []
-                for zz in range(len(dfall)):
-                    if(dfall.iloc[zz]['Color'] not in colors):
-                        colors.append(dfall.iloc[zz]['Color'])
-                for yy in range(len(colors)):
-                    colordf = dfall.loc[dfall['Color'] == colors[yy]] 
-                    dfsByColor.append(colordf)
-                df1 = data.get(ticker,tf,account = True)
-                startdate = dfall.iloc[0]['Datetime']
-                enddate = dfall.iloc[-1]['Datetime']
-                try:
-                    l1 = data.findex(df1,startdate) - 50
-                except:
-                    if 'd' in tf or 'w' in tf:
-                        df1 = df1 = data.get(ticker,tf,account = False)
-                        l1 = data.findex(df1,startdate) - 50
-                    else:
-                        raise Exception()
-                closed = df.iloc[i]['closed']
-                if closed:
-                    r1 = data.findex(df1,enddate) + 50
+        trait_bar = df.iloc[i]
+        ticker = trait_bar['ticker']
+        dt = trait_bar['datetime']
+        for ii in range(len(tflist)):
+            if not from_traits: 
+                p = pathlib.Path("C:/Stocks/local/account/charts") / (str(ii) + '_' + str(i)  + ".png")
+                if os.path.exists(p): return
+            else: p = 'C:/Stocks/local/account/trait.png'
+
+            tf = tflist[ii]
+                
+
+            datelist = []
+            colorlist = []
+            trades = []
+            for k in range(len(df.iat[i,2])):
+                date = datetime.datetime.strptime(df.iat[i,2][k][1], '%Y-%m-%d %H:%M:%S')
+                if tf == 'd':
+                    date = date.date()
+                val = float(df.iat[i,2][k][2])
+                if val > 0:
+                    colorlist.append('g')
+                    add = pd.DataFrame({
+                            'Datetime':[df.iat[i,2][k][1]], 
+                            'Symbol':[df.iat[i,2][k][0]],
+                            'Action':"Buy",
+                            'Price':[float(df.iat[i,2][k][3])]
+                            })
+                    trades.append(add)
                 else:
-                    r1 = len(df1)
-                minmax = 300
-                if l1 < 0:
-                    l1 = 0
-                df1 = df1[l1:r1]
-                times = df1.index.to_list()
-                timesdf = []
-                for _ in range(len(df1)):
-                    nextTime = pd.DataFrame({ 
-                        'Datetime':[df1.index[_]]
-                        })
-                    timesdf.append(nextTime)
-                mainindidf = pd.concat(timesdf).set_index('Datetime', drop=True)
-                apds = [mpf.make_addplot(mainindidf)]
-                for datafram in dfsByColor:
-                    datafram['Datetime'] = pd.to_datetime(datafram['Datetime'])
-                    tradelist = []
-                    for t in range(len(datafram)): 
-                        tradeTime = datafram.iloc[t]['Datetime']
-                        for q in range(len(times)):
-                            if(q+1 != len(times)):
-                                if(times[q+1] >= tradeTime):
-                                    test = pd.DataFrame({
-                                        'Datetime':[times[q]],
-                                        'Marker':[datafram.iloc[t]['Marker']],
-                                        'Price':[float(datafram.iloc[t]['Price'])]
-                                        })
-                                    tradelist.append(test)
-                                    break
-                            else:
+                    colorlist.append('r')
+                datelist.append(date)
+            god = bar[1].iloc[i]['arrow_list']
+            god = [list(x) for x in god]
+            dfall= pd.DataFrame(god, columns=['Datetime', 'Price', 'Color', 'Marker'])
+            dfall['Datetime'] = pd.to_datetime(dfall['Datetime'])
+            dfall = dfall.sort_values('Datetime')
+            colors = []
+            dfsByColor = []
+            for zz in range(len(dfall)):
+                if(dfall.iloc[zz]['Color'] not in colors):
+                    colors.append(dfall.iloc[zz]['Color'])
+            for yy in range(len(colors)):
+                colordf = dfall.loc[dfall['Color'] == colors[yy]] 
+                dfsByColor.append(colordf)
+            startdate = dfall.iloc[0]['Datetime']
+            enddate = dfall.iloc[-1]['Datetime']
+            df1 = data.get(ticker,tf,dt,100,50)
+            if df1.empty: 
+                shutil.copy(r"C:\Stocks\sync\files\blank.png",p)
+                continue
+                
+            minmax = 300
+            
+            times = df1.index.to_list()
+            timesdf = []
+            for _ in range(len(df1)):
+                nextTime = pd.DataFrame({ 
+                    'Datetime':[df1.index[_]]
+                    })
+                timesdf.append(nextTime)
+            mainindidf = pd.concat(timesdf).set_index('Datetime', drop=True)
+            apds = [mpf.make_addplot(mainindidf)]
+            for datafram in dfsByColor:
+                datafram['Datetime'] = pd.to_datetime(datafram['Datetime'])
+                tradelist = []
+                for t in range(len(datafram)): 
+                    tradeTime = datafram.iloc[t]['Datetime']
+                    for q in range(len(times)):
+                        if(q+1 != len(times)):
+                            if(times[q+1] >= tradeTime):
                                 test = pd.DataFrame({
-                                        'Datetime':[times[q]],
-                                        'Marker':[datafram.iloc[t]['Marker']],
-                                        'Price':[float(datafram.iloc[t]['Price'])]
-                                        })
+                                    'Datetime':[times[q]],
+                                    'Marker':[datafram.iloc[t]['Marker']],
+                                    'Price':[float(datafram.iloc[t]['Price'])]
+                                    })
                                 tradelist.append(test)
                                 break
-                    df2 = pd.concat(tradelist).reset_index(drop = True)
-                    df2['Datetime'] = pd.to_datetime(df2['Datetime'])
-                    df2 = df2.sort_values(by=['Datetime'])
-                    df2['TradeDate_count'] = df2.groupby("Datetime").cumcount() + 1
-                    newdf = (df2.pivot(index='Datetime', columns='TradeDate_count', values="Price")
-                        .rename(columns="price{}".format)
-                        .rename_axis(columns=None))
-                    series = mainindidf.merge(newdf, how='left', left_index=True, right_index=True)[newdf.columns]
-                    if series.isnull().values.all(axis=0)[0]:
-                        pass
-                    else: 
-                        apds.append(mpf.make_addplot(series,type='scatter',markersize=300,alpha = .4,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
-                if tf != '1min': mav = (10,20,50)
-                else: mav = ()
-                _, axlist = mpf.plot(df1, type='candle', volume=True  , 
-                                        title=str(f'{ticker} , {tf}'), 
-                                        style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config('Plot chart_aspect_ratio'),1),
-                                        figscale=data.get_config('Plot chart_size'), panel_ratios = (5,1), mav=mav, 
-                                        tight_layout = True,
-                                        addplot=apds)
-                ax = axlist[0]
-                ax.set_yscale('log')
-                ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
-                plt.savefig(p1, bbox_inches='tight',dpi = data.get_config('Plot chart_dpi')) 
+                        else:
+                            test = pd.DataFrame({
+                                    'Datetime':[times[q]],
+                                    'Marker':[datafram.iloc[t]['Marker']],
+                                    'Price':[float(datafram.iloc[t]['Price'])]
+                                    })
+                            tradelist.append(test)
+                            break
+                df2 = pd.concat(tradelist).reset_index(drop = True)
+                df2['Datetime'] = pd.to_datetime(df2['Datetime'])
+                df2 = df2.sort_values(by=['Datetime'])
+                df2['TradeDate_count'] = df2.groupby("Datetime").cumcount() + 1
+                newdf = (df2.pivot(index='Datetime', columns='TradeDate_count', values="Price")
+                    .rename(columns="price{}".format)
+                    .rename_axis(columns=None))
+                series = mainindidf.merge(newdf, how='left', left_index=True, right_index=True)[newdf.columns]
+                if series.isnull().values.all(axis=0)[0]:
+                    pass
+                else: 
+                    apds.append(mpf.make_addplot(series,type='scatter',markersize=300,alpha = .4,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
+            if tf != '1min': mav = (10,20,50)
+            else: mav = ()
+
+            mc = mpf.make_marketcolors(up='g',down='r')
+            s  = mpf.make_mpf_style(marketcolors=mc)
+            _, axlist = mpf.plot(df1, type='candle', volume=True  , 
+                                    title=str(f'{ticker} , {tf}'), 
+                                    style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config(f'{source} chart_aspect_ratio'),1),
+                                    figscale=data.get_config(f'{source} chart_size'), panel_ratios = (5,1), mav=mav, 
+                                    tight_layout = True,axisoff = True,
+                                    addplot=apds)
+            ax = axlist[0]
+            ax.set_yscale('log')
+            ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
+            plt.savefig(p, bbox_inches='tight',dpi = data.get_config(f'{source} chart_dpi')) 
 
 if __name__ == '__main__':
     Run.run(Run)
