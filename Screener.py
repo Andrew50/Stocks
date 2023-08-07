@@ -66,8 +66,6 @@ class Screener:
 			setups = data.score(dfs,setup_type,threshold)
 			for ticker, z, df in setups:
 				Screener.log(ticker,z,df,tf,path,setup_type)
-  
-	
 
 	def log(ticker,z, df, tf,  path, setup_type):
 		z = round(z * 100)

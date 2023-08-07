@@ -183,15 +183,13 @@ class Log:
             log = pd.read_csv(download_folder + '/Webull_Orders_Records.csv')
             log2 = pd.DataFrame()
             log2['ticker'] = log['Symbol']
-            log2['datetime']  = pd.to_datetime(log['Placed Time'])
+            log2['datetime']  = pd.to_datetime(log['Filled Time'],format='mixed')
             log2['shares'] = log['Total Qty']
-            log2['filled'] = log['Filled']
+            log2['price'] = log['Avg Price']
             for i in range(len(log)):
                 if log.at[i,'Side'] != 'Buy':
                     log2.at[i,'shares'] *= -1
-            log2['price'] = log['Avg Price']
             log2['setup'] = ''
-            print(log2)
             log2 = log2.dropna()
             log2 = log2[(log2['datetime'] > '2021-12-01')]
             log2 = log2.sort_values(by='datetime', ascending = False).reset_index(drop = True)
