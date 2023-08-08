@@ -182,7 +182,7 @@ class Log:
             mail.logout()
             log = pd.read_csv(download_folder + '/Webull_Orders_Records.csv')
             log2 = pd.DataFrame()
-            log2['ticker'] = log['Symbol']
+            log2['ticker'] = log['Symbol'] 
             log2['datetime']  = pd.to_datetime(log['Filled Time'],format='mixed')
             log2['shares'] = log['Total Qty']
             log2['price'] = log['Avg Price']
@@ -232,7 +232,7 @@ class Log:
             updated_log =  dfn
         else:
             raise Exception('no pull method created')
-        #Log.recalc(self,updated_log)
+        Log.recalc(self,updated_log)
 
 
 class Traits:
@@ -434,9 +434,13 @@ class Traits:
         pnl_account = ((pnl_dollars / account_size)) * 100
         high_percent = ((high_price / float(first_trade[3])) - 1) * 100 * direction
         size_percent = (size_dollars / account_size) * 100
+
+        def try_round(v):
+            try: return round(v,2)
+            except: return v
         traits = pd.DataFrame({
-        'ticker': [ticker], 'datetime':[open_datetime], 'trades': [trades], 'setup':[setup], 'pnl $':[pnl_dollars], 'pnl %':[pnl_percent], 'pnl a':[pnl_account], 'size $':[size_dollars], 'size %':[size_percent],  'high %':[high_percent],
-       'risk %':[risk_percent], 'min %':[min_percent],'min a':[min_account], 'arrow_list':[arrow_list], 'closed':[closed], 'open':[0], 'high':[high_dollars], 'low':[low_dollars], 'close':[pnl_dollars],'volume':[total_size],})
+        'ticker': [ticker], 'datetime':[open_datetime], 'trades': [trades], 'setup':[setup], 'pnl $':[try_round(pnl_dollars)], 'pnl %':[try_round(pnl_percent)], 'pnl a':[try_round(pnl_account)], 'size $':[try_round(size_dollars)], 'size %':[try_round(size_percent)],  'high %':[try_round(high_percent)],
+       'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)],'min a':[try_round(min_account)], 'arrow_list':[arrow_list], 'closed':[try_round(closed)], 'open':[0], 'high':[try_round(high_dollars)], 'low':[try_round(low_dollars)], 'close':[try_round(pnl_dollars)],'volume':[try_round(total_size)]})
         return traits
 
     def calc_trait_values(df,title):
@@ -500,7 +504,7 @@ class Traits:
             y = [b[self.event[2][1]] for b in table]
             x = [i + 1 for i in range(len(table))]
             plt.clf()
-            plt.scatter(x,y)
+            plt.scatter(x,y,s = data.get_config('Traits market_size'))
             if self.event[0] == '-table_rolling_traits-':
                 z = np.polyfit(x[1:], y[1:], 1)
                 p = np.poly1d(z)
@@ -562,24 +566,36 @@ class Account:
             self.init = False
             layout =[
             [sg.Image(key = '-CHART-')],
-            [sg.Button('Trade'),sg.Button('Real'),sg.Button('Recalc')],
+            [sg.Button('Trade'),sg.Button('Periodic Trade'),sg.Button('Real'),sg.Button('Periodic Real'),sg.Button('Recalc')],
             [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
             self.window = sg.Window(self.menu, layout,margins = (10,10),scaling=data.get_config('Account ui_scale'),finalize = True)
-        if self.pnl_chart_type == 'Trade':
+        if 'Trade' in self.pnl_chart_type:
+            
             df = self.df_traits.set_index('datetime')[['open','high','low','close','volume']]
-            pc = 0
-            for i in range(len(df)):
-                v = df.iat[i,4]
-                c = df.iat[i,3] + pc
-                o = pc
-                h = df.iat[i,1] + pc
-                l = df.iat[i,2] + pc
-                df.iloc[i] = [o,h,l,c,v]
-                pc = c
-        elif self.pnl_chart_type == 'Real':
+            if 'Periodic' not in self.pnl_chart_type:
+                pc = 0
+                for i in range(len(df)):
+                    v = df.iat[i,4]
+                    c = df.iat[i,3] + pc
+                    o = pc
+                    h = df.iat[i,1] + pc
+                    l = df.iat[i,2] + pc
+                    df.iloc[i] = [o,h,l,c,v]
+                    pc = c
+        elif 'Real' in self.pnl_chart_type:
             df = self.df_pnl
             logic = {'open'  : 'first','high'  : 'max','low'   : 'min','close' : 'last','volume': 'sum' }
             df = df.resample('d').apply(logic).dropna()
+            if 'Periodic' in self.pnl_chart_type:
+                pc = 0
+                for i in range(len(df)):
+                    c = df.iat[i,3] - pc
+                    v = df.iat[i,4]
+                    o = 0
+                    h = df.iat[i,1] - pc
+                    l = df.iat[i,2] - pc
+                    df.iloc[i] = [o,h,l,c,v]
+                    pc += c
         mc = mpf.make_marketcolors(up='g',down='r')
         s  = mpf.make_mpf_style(marketcolors=mc)
         string1 = "pnl.png"
@@ -780,7 +796,7 @@ class Plot:
 
     def update(self):
         trade_headings = ['Date             ','Shares   ','Price  ']
-        trait_headings = ['pnl $','pnl %','pnl a', 'high %','risk %']
+        trait_headings = ['setup','pnl $','pnl %','pnl a', 'high %','risk %']
         if self.init:
             Plot.sort(self)
             
