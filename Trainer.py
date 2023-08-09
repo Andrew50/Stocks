@@ -10,7 +10,6 @@ from PIL import Image
 import time
 import sys
 import pathlib
-import datetime
 import io
 import matplotlib.ticker as mticker
 import shutil
@@ -55,6 +54,7 @@ class Trainer:
 						self.click(self)
 					elif self.event in self.tf_list:
 						self.current_tf = self.event
+						self.current_setup = [s for s in self.full_setup_list if self.current_tf in s][0]
 						self.init = True
 						self.update(self)
 					else:
@@ -62,37 +62,51 @@ class Trainer:
 
 				elif self.current_menu == 'Validator' or self.current_menu == 'Tuner':
 					if self.event in self.full_setup_list:
+						if self.current_menu == 'Tuner':
+							if not os.path.exists('C:/Stocks/sync/models/model_' + self.event): 
+								sg.Popup(f'{self.event} model does not exist')
+								continue
+							df = pd.read_feather('C:/Stocks/local/data/' + self.event + '.feather')
+							length = len(df[df['value'] == 1])
+							print(length)
+							if  length < 200: 
+								sg.Popup(f'{self.event} only has {length} yes data points')
+								continue
 						self.init = True
 						self.current_setup = self.event
 						self.update(self)
-					elif self.event == 'right_button' or self.event == 'left_button':
-						if self.event == 'right_button': val = 1
-						else: val = 0
-						if self.current_menu == 'Validator': bar = self.chart_info[self.i]
-						else: bar = self.chart_info[self.i//self.sub_preload_amount].get()[self.i%self.sub_preload_amount]
-						if self.current_menu == 'Validator': ident = self.setup_df.iloc[self.i]['source']
-						else: ident = None
-						print(self.chart_info)
-						print(bar)
+					elif self.i < len(self.chart_info) - 1:
+						if self.event == 'right_button' or self.event == 'left_button':
 						
-						data.add_setup(bar[1],bar[0].index[-1],self.current_setup,val,1,ident)
-						self.i += 1
-						self.update(self)
-						self.preload(self)
-					elif self.event == 'center_button':
+							if self.event == 'right_button': val = 1
+							else: val = 0
+							if self.current_menu == 'Validator': bar = self.chart_info[self.i]
+							else: bar = self.chart_info[self.i//self.sub_preload_amount].get()[self.i%self.sub_preload_amount]
+							if self.current_menu == 'Validator': ident = self.setup_df.iloc[self.i]['source']
+							else: ident = None
+							print(self.chart_info)
+							print(bar)
+						
+							data.add_setup(bar[1],bar[0].index[-1],self.current_setup,val,1,ident)
+							self.i += 1
+							self.update(self)
+							self.preload(self)
+						elif self.event == 'center_button':
 
-						self.i += 1
-						self.update(self)
-						self.preload(self)
+							self.i += 1
+							self.update(self)
+							self.preload(self)
 				elif self.current_menu == 'Tester' or self.current_menu == 'Manual' :
 					if self.event == 'Enter':
 						ticker = self.values['-input_ticker-']
 						datetime = self.values['-input_datetime-']
 						setup = self.values['-input_setup-']
-						if self.current_menu == 'Manual': data.add_setup(ticker,datetime,setup,1,0)
-						else:
-							df = data.get(ticker,setup.split('_')[0],datetime)
-							self.window['-score-'].update(f'{100 * data.score([df],[ticker],setup)[0][1]}% confident')
+						try:
+							if self.current_menu == 'Manual': data.add_setup(ticker,datetime,setup,1,0)
+							else:
+								df = data.get(ticker,setup.split('_')[0],datetime)
+								self.window['-score-'].update(f'{round(100 * data.score(df,setup,False)[0][2])}% confident')
+						except Exception as e: sg.Popup(e)
 
 				
 
@@ -189,7 +203,11 @@ class Trainer:
 			self.i = 0
 			self.chart_edge_size = data.get_config('Trainer chart_edge_size')
 			if os.path.exists('C:/Stocks/local/trainer/charts'):
-				shutil.rmtree('C:/Stocks/local/trainer/charts')
+				while True:
+					try: 
+						shutil.rmtree('C:/Stocks/local/trainer/charts')
+						break
+					except: pass
 			os.mkdir('C:/Stocks/local/trainer/charts')
 			self.chart_height = data.get_config('Trainer image_box_height')
 			self.chart_width = data.get_config('Trainer image_box_width')
@@ -211,7 +229,14 @@ class Trainer:
 			elif self.current_menu == 'Validator':
 				df = pd.read_feather('C:/Stocks/local/data/' + self.current_setup + '.feather').sample(frac = 1)
 				self.setup_df = df[df['value'] == 1]
+				print(self.setup_df)
+				#if self.setup_df.empty: 
 
+				#	sg.Popup(f'{self.current_setup} has no setups')
+				#	self.current_setup = self.full_setup_list[0]
+				#	self.init = True
+				#	Trainer.update(self)
+				#	return
 				layout = [[graph],
 				[sg.Button(s) for s in self.full_setup_list],
 				[ sg.Text(self.current_setup, key = '-curent_setup-'), sg.Text(key = '-counter-')]]
@@ -272,30 +297,29 @@ class Trainer:
 					while True:
 						try:
 							ticker = self.full_ticker_list[random.randint(0,len(self.full_ticker_list)-1)]
-							if '/' in ticker: raise TimeoutError ####
 							df = data.get(ticker,tf = self.current_tf)
-							date_list = df.index.to_list()
-							datetime = date_list[random.randint(0,len(date_list) - 1)]
-							index = data.findex(df,datetime)
-							left = index - 300
-							if left < 0:left = 0
-							df = df[left:index + 1]
-							if(data.get_requirements(ticker, df, self.current_tf, self.current_setup)):
-								break
+							if not df.empty:
+								index = random.randint(0,len(df) - 1)
+								left = index - 300
+								if left < 0:left = 0
+								df = df[left:index + 1]
+								if data.get_requirements(ticker, df, self.current_setup): break
 						except TimeoutError as e:
 							pass
 					title = ''
 					self.chart_info.append([df,ticker,title,i])
 				elif self.current_menu == 'Validator':
+					if i >= len(self.setup_df):  
+						print('broke')
+						break
 					ticker = self.setup_df.iat[i,0]
 					datetime = self.setup_df.iat[i,1]
 					df = data.get(ticker,self.current_setup.split('_')[0],datetime,250)
 					title = self.current_setup
-					self.chart_info.append([df,ticker,title,i])
-			arglist = [self.chart_info[i] for i in index_list]
+				self.chart_info.append([df,ticker,title,i])
+			arglist = [self.chart_info[i] for i in index_list if i in list(range(len(self.chart_info)))]
 			self.pool.map_async(Trainer.plot,arglist)
 		elif self.current_menu == 'Tuner':
-			sub_preload_amount = 5
 			run = True
 			if self.i == 0:
 				index_list = list(range(0,30,5))
@@ -309,25 +333,23 @@ class Trainer:
 				for arg in arglist:
 					self.chart_info.append (self.pool.apply_async(Trainer.create_tune, args = (arg)))
 
-	def create_tune(i_list,current_tf,current_setup,full_ticker_list):
-		model = load_model('C:/Stocks/sync/models/model_' + current_setup)
+	def create_tune(i_list,current_tf,st,full_ticker_list):
+		model = load_model('C:/Stocks/sync/models/model_' + st)
 		info_list = []
 		ii = 0
 		while True:
 			ticker = full_ticker_list[random.randint(0,len(full_ticker_list)-1)]
 			df = data.get(ticker,tf = current_tf)
-			setups = data.score(df,current_setup,.25, model)
-			for ticker, score, df in setups:
-				dol_vol,_,_ = screener.get_requirements(df,-1)
-				if (dol_vol > 5000000 and 'd' in current_tf) or (dol_vol > 2000000 and 'h' in current_tf) or (dol_vol > 50000 and 'min' in current_tf):
-					if len(df) > 250: df = df[-250:]
-					title = str(round(100*score))
-					i = i_list[ii]
-					Trainer.plot([df,ticker,title,i])
-					info_list.append([df,ticker,title,i])
-					ii += 1
-					if ii == len(i_list):
-						return info_list
+			setups = data.score(df,st,True,.25, model)
+			for ticker, dt, score, df in setups:
+				title = str(round(100*score))
+				i = i_list[ii]
+				df = df[-300:]
+				Trainer.plot([df,ticker,title,i])
+				info_list.append([df,ticker,title,i])
+				ii += 1
+				if ii == len(i_list):
+					return info_list
 
 	def plot(bar):
 		df = bar[0]
@@ -337,14 +359,14 @@ class Trainer:
 		try:
 			mc = mpf.make_marketcolors(up='g',down='r')
 			s  = mpf.make_mpf_style(marketcolors=mc)
-			fig, axlist = mpf.plot(df, type='candle', volume=True  ,                          
+			fig, axlist = mpf.plot(df, type='candle', volume=True,                           
 			style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config('Trainer chart_aspect_ratio'),1),
 			figscale=data.get_config('Trainer chart_size'), panel_ratios = (5,1), title = title, tight_layout = True,axisoff=True)
 			ax = axlist[0]
 			ax.set_yscale('log')
 			ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
 			plt.savefig(p, bbox_inches='tight',dpi = data.get_config('Trainer chart_dpi'))
-		except Exception as e:
+		except TimeoutError as e:
 			print(e)
 			shutil.copy(r'C:\Stocks\sync\files\blank.png',p)
 

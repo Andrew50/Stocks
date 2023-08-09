@@ -38,7 +38,7 @@ class Study:
                     if self.event == 'Yes': val = 1
                     else: val = 0
                     self.event = 'Next'
-                    bar = self.setups_data.iloc[self.i]
+                    bar = self.setups_data.iloc[math.floor(self.i)]
                     ticker = bar['ticker']
                     date = bar['datetime']
                     setup = bar['setup']
@@ -64,8 +64,8 @@ class Study:
 
     def preload(self):
         if self.i == 0:
-            if self.current: index_list = [i for i in range(self.preload_amount)]
-            else: index_list = [i/2 for i in range(self.preload_amount*2)]
+            if self.current: index_list = [float(i) for i in range(self.preload_amount)]
+            else: index_list = [float(i/2) for i in range(self.preload_amount*2)]
         else: index_list = [self.preload_amount + self.i - 1]
         arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
         self.pool.map_async(self.plot,arglist)
@@ -73,7 +73,7 @@ class Study:
     def lookup(self):
         try:
             if self.current:
-                scan = pd.read_feather(r"C:\Screener\local\study\todays_setups.feather").sort_values(by=['z'], ascending=False)
+                scan = pd.read_feather(r"C:\Stocks\local\study\current_setups.feather").sort_values(by=['z'], ascending=False)
             else:
                 scan = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
                 sort_val = None
@@ -178,7 +178,7 @@ class Study:
                 if (current or revealed) and ii == 1: title = f'{ticker} {setup} {z} {tf}' 
                 else: title = str(tf)
                 if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[date], alpha = .25))
-                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)#, hlines=dict(hlines=[pmPrice], alpha = .25))
+                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
                 ax = axlist[0]
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -236,4 +236,4 @@ class Study:
         self.window.maximize()
 
 if __name__ == "__main__":
-    Study.run(Study,False)
+    Study.run(Study,True)

@@ -6,6 +6,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 from pyarrow import feather
+import pyarrow
 import sys
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -16,7 +17,7 @@ from tvDatafeed import TvDatafeed, Interval
 import os
 import datetime
 import numpy
-from multiprocessing import Pool
+from multiprocessing import Pool, current_process
 import warnings
 import yfinance as yf
 import shutil
@@ -132,7 +133,7 @@ class Data:
 			add = add[add_index:]
 			return pd.concat([df,add])
 		try: df = feather.read_feather(Data.data_path(ticker,tf))
-		except FileNotFoundError: df = pd.DataFrame()
+		except (FileNotFoundError, pyarrow.lib.ArrowInvalid): df = pd.DataFrame()
 		if dt != None:
 			dt = Data.format_date(dt)
 			adj_dt = adjust_date(dt,tf) #round date to nearest non premarket datetime
@@ -145,23 +146,30 @@ class Data:
 
 					index = Data.findex(df,adj_dt)
 				except websocket._exceptions.WebSocketAddressException : #no internet
-					print('no internet')
+					 ##no internet
+					if df.empty: return df
 					index = len(df) - 1
 				except TimeoutError:
-					print(f'ticker {ticker} has no data at {dt}')
+					#(f'ticker {ticker} has no data at {dt}')
 					if df.empty: return pd.DataFrame()
 					index = len(df) - 1
 			if offset == 0: df = df[:index + 1]
 			if dt.hour < 5 or (dt.hour == 5 and dt.minute < 30):  ####if date requested is premarket
 				if 'd' in tf or 'w' in tf:
-					df = append_tv(ticker,tf,df,True)
+					try: df = append_tv(ticker,tf,df,True)
+					except websocket._exceptions.WebSocketAddressException: pass ###no internet
 				else:
-					pmchange = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('Ticker').loc[ticker]['Pre-market Change']
+					pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('Ticker').loc[ticker]
+					pm_change = pm_bar['Pre-market Change']
+					pm_vol = pm_bar['Pre-market Volume']
 					if numpy.isnan(pmchange): pmchange = 0
-					pm = df.iat[-1,3] + pmchange
+					if numpy.isnan(pm_vol): pm_vol = 0
+					pm_price = pm_change +  df.iat[-1,3]
 					date = pd.Timestamp(datetime.datetime.today())
-					row  =pd.DataFrame({'datetime': [date], 'open': [pm],'high': [pm], 'low': [pm], 'close': [pm], 'volume': [0]}).set_index("datetime")
+					row  =pd.DataFrame({'datetime': [date], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_vol]}).set_index("datetime",drop = True)
 					df = pd.concat([df, row])
+
+		if df.empty: return df
 		if 'w' in tf: 
 			last_bar = df.tail(1)
 			df.index = df.index - pd.Timedelta(days = 7)
@@ -188,7 +196,7 @@ class Data:
 		if ticker == None or "/" in ticker  or '.' in ticker: return
 		exists = True
 		try:
-			df = Data.get(ticker,tf)
+			df = feather.read_feather(Data.data_path(ticker,tf))
 			last_day = df.index[-1] 
 			if last_day == current_day:
 				return
@@ -219,7 +227,7 @@ class Data:
 		df.index.rename('datetime', inplace = True)
 		if tf == '1min':
 			df = df.between_time('09:30' , '15:59')
-		feather.write_feather(df,Data.data_path(ticker,tf))
+		if not df.empty: feather.write_feather(df,Data.data_path(ticker,tf))
 
 	def setup_directories():
 		dirs = ['C:/Stocks/local','C:/Stocks/local/data','C:/Stocks/local/account','C:/Stocks/local/screener',
@@ -237,37 +245,46 @@ class Data:
 		current_day = tv.get_hist('QQQ', 'NASDAQ', n_bars=2).index[Data.is_market_open()]
 		current_minute = tv.get_hist('QQQ', 'NASDAQ', n_bars=2, interval=Interval.in_1_minute, extended_session = False).index[Data.is_market_open()]
 		from Screener import Screener as screener
-		scan = pd.DataFrame({"Ticker": ["COIN"]}).set_index("Ticker") #screener.get('current')
+		#scan = pd.DataFrame({"Ticker": ["AAPL"]}).set_index("Ticker") 
+		scan = screener.get('current')
 		batches = []
 		for i in range(len(scan)):
 		   ticker = scan.index[i]
 		   batches.append([ticker, current_day, 'd'])
 		   batches.append([ticker, current_minute, '1min'])
 		Data.pool(Data.update, batches)
-		setup_list = Data.get_setups_list()
+		Data.refill_backtest()
 		Data.combine_training_data()
-		epochs = 200
-		prcnt_setup = .05
+		if Data.get_config("Data identity") == 'desktop':
+			setup_list = Data.get_setups_list()
+			weekday = datetime.datetime.now().weekday()
+			if weekday%3 == 0:
+				for s in setup_list:
+					Data.train(s,.05,200,False)
+			if  weekday == 4:
+				Data.backup()
+
+		
+
+	def refill_backtest():
+		from Screener import Screener as screener
 		historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"):
 			shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
 		while(len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
 			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-			print(len(historical_setups[historical_setups["post_annotation"] == ""]))
 			full_list_minus_annotation = full_list_minus_annotation.sample(frac=1)
 			for t in range(8):
 				screener.run(ticker=full_list_minus_annotation.iloc[t]["Ticker"], fpath=0)
 			full_list_minus_annotation = full_list_minus_annotation[8:].reset_index(drop=True)
 			full_list_minus_annotation.to_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-			
+			historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 
-		if Data.get_config("Data identity") == 'desktop':
-			for s in setup_list:
-				Data.train(s,prcnt_setup,epochs,False)
-			if datetime.datetime.now().weekday() == 4:
-				Data.backup()
+
+
 
 	def backup():
+
 		date = datetime.date.today()
 		src = r'C:/Scan'
 		dst = r'D:/Backups/' + str(date)
@@ -348,35 +365,39 @@ class Data:
 				setups.append(s)
 		return setups
 
-	def score(dfs,setup_type,threshold = 0,model = None):
+	def score(dfs,st,use_whole_df = False,threshold = 0,model = None):
 		if not isinstance(dfs, list):dfs = [dfs]
-		if model == None: model = load_model('C:/Stocks/sync/models/model_' + str(setup_type))
+		if model == None: model = load_model('C:/Stocks/sync/models/model_' + st)
 		setups = []
-		for df in dfs:
-			x,y= Data.format(dfs,setup_type,False)
-			sys.stdout = open(os.devnull, 'w')
-			scores = model.predict(x)
-			sys.stdout = sys.__stdout__
-			scores = scores[:,1]
-			for i in range(len(scores)):
-				score = scores[i]
-				if score > threshold:
-					ticker = df.iloc[0]['ticker']
-					d = df[:i + 1]
-					if(Data.get_requirements(ticker, d) == True):
-						setups.append([ticker,score,d])
+		x,_,info= Data.format(dfs,st,use_whole_df)
+		sys.stdout = open(os.devnull, 'w')
+		scores = model.predict(x)
+		sys.stdout = sys.__stdout__
+		scores = scores[:,1]
+		for i in range(len(scores)):
+			score = scores[i]
+			if score > threshold:
+				bar = info[i]
+				ticker = bar[0]
+				dt = bar[1]
+				key = bar[2]
+				df = dfs[key]
+				df = df[:Data.findex(df,dt) + 1]
+				if Data.get_requirements(ticker, df,st):
+					setups.append([ticker,dt,score,df])
 		return setups
 		
 	def worker(bar):
-		def time_series(df: pd.DataFrame,
-					col: str,
-					name: str, sample_size) -> pd.DataFrame:
+		def time_series(df: pd.DataFrame,col: str,name: str, sample_size) -> pd.DataFrame:
 			return df.assign(**{
 				f'{name}_t-{lag}': col.shift(lag)
-				for lag in range(0, sample_size)
-			})
-		def get_classification(df: pd.DataFrame,value) -> pd.DataFrame:
+				for lag in range(0, sample_size)})
+		def get_classification(df: pd.DataFrame,value,ticker,dt,key) -> pd.DataFrame:
 			df['classification'] = value
+			df['ticker'] = ticker
+			df['dt'] = dt
+			df['key'] = key
+
 			return df
 		def get_lagged_returns(df: pd.DataFrame, sample_size) -> pd.DataFrame:
 			FEAT_COLS = ['open', 'low', 'high', 'close']
@@ -384,33 +405,34 @@ class Data:
 				return_col = df[col]/df['close'].shift(1)  - 1
 				df = time_series(df, return_col, f'feat_{col}_ret', sample_size)
 			return df
-		setup_type = bar[1]
-		sample_size = Data.setup_size(setup_type)
-		try:
-			ticker = bar[0][0]
-			date = bar[0][1]
-			value = bar[0][2]
-			tf = setup_type.split('_')[0]
-			df = Data.get(ticker,tf,date,sample_size + 1)
-		except :
-			df = bar[0]
-			value = 0
-		if df.empty:
-			return
-		if len(df) < sample_size + 1:
-			add = pd.DataFrame(df.iat[-1,3], index=np.arange(sample_size - len(df) + 1), columns=df.columns)
-			df = pd.concat([add,df])
-		if len(df) > sample_size + 1:
+
+
+		df = bar[0]
+		ticker = df['ticker'][0]
+		try: value = df['value'][0]
+		except: value = 0
+		use_whole_df = bar[2]
+		st = bar[1]
+		key = bar[3]
+		sample_size = Data.setup_size(st)
+		if df.empty: return
+		if use_whole_df:
 			add = pd.DataFrame(df.iat[-1,3], index=np.arange(sample_size ), columns=df.columns)
 			df = pd.concat([add,df])
+		else:
+			df = df[-sample_size - 1:]
+			if len(df) < sample_size + 1:
+				add = pd.DataFrame(df.iat[-1,3], index=np.arange(sample_size - len(df) + 1), columns=df.columns)
+				df = pd.concat([add,df])
+		dt = df.index
+
 		df = get_lagged_returns(df, sample_size)
 		for col in ['high','low','close']: df[f'feat_{col}_ret_t-{sample_size - 1}'] = df[f'feat_open_ret_t-{sample_size-1}'] #make last high low close the same as open so no hinsdight
-
-		df = get_classification(df,value)
-		df = df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification']]
+		df = get_classification(df,value,ticker,dt,key)
+		df = df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification'] + ['ticker'] + ['dt'] + ['key']]
 		return  df
 
-	def format(setups, setup_type,nodes = True):
+	def format(dfs, st,use_whole_df = False):
 		def reshape_x(x: np.array,FEAT_LENGTH) -> np.array:
 			num_feats = x.shape[1]//FEAT_LENGTH
 			x_reshaped = np.zeros((x.shape[0], FEAT_LENGTH, num_feats))
@@ -418,31 +440,26 @@ class Data:
 				x_reshaped[:, :, n] = x[:, n*FEAT_LENGTH:(n+1)*FEAT_LENGTH]
 			return x_reshaped
 		arglist = []
-		if isinstance(setups, pd.DataFrame):
-			for i in range(len(setups)):
-				ticker = setups.iat[i,0]
-				date = setups.iat[i,1]
-				value = setups.iat[i,2]
-				arglist.append([[ticker,date,value],setup_type])
-		else:
-			for df in setups:
-				arglist.append([df,setup_type])
-		if nodes: dfs = Data.pool(Data.worker,arglist)
+		for i in range(len(dfs)):
+			df = dfs[i]
+			arglist.append([df,st,use_whole_df,i])
+		if current_process().name == 'MainProcess': dfs = Data.pool(Data.worker,arglist)  ##if not a worker process already
 		else: dfs = [Data.worker(arglist[i]) for i in range(len(arglist))]
 		values = pd.concat(dfs).values
-		y = values[:,-1]
-		x_values = values[:,:-1]
-		x = reshape_x(x_values,Data.setup_size(setup_type))
-		return x , y
+		y = values[:,-4]
+		info = values[:,-3:]
+		x_values = values[:,:-4]
+		x = reshape_x(x_values,Data.setup_size(st))
+		return x , y , info
 	
 	def setup_size(setup_type):
 		if 'F' in setup_type:
 			return 80
 		return 40
 
-	def sample(setuptype,use):
+	def sample(st,use):
 		buffer = 2
-		allsetups = pd.read_feather('C:/Stocks/local/data/' + setuptype + '.feather').sort_values(by='date', ascending = False).reset_index(drop = True)
+		allsetups = pd.read_feather('C:/Stocks/local/data/' +st + '.feather').sort_values(by='date', ascending = False).reset_index(drop = True)
 		yes = []
 		no = []
 		req_no = []
@@ -485,16 +502,25 @@ class Data:
 		no = no.sample(frac = use)
 		allsetups = pd.concat([yes,no,req_no]).sample(frac = 1).reset_index(drop = True)
 		setups = allsetups
-		return setups
+		dfs = []
+		for i in range(len(setups)):
+			bar = setups.iloc[i]
+			ticker = bar[0]
+			dt = bar[1]
+			v = bar[2]
+			df = Data.get(ticker,dt,st.split('_')[0])
+			df['value'] = v
+			dfs.append(df)
+		return dfs
    
-	def train(setup_type,percent_yes,epochs):
-		setups = Data.sample(setup_type, percent_yes)
-		x, y = Data.format(setups,setup_type)
+	def train(st,percent_yes,epochs):
+		dfs = Data.sample(st, percent_yes)
+		x, y, t = Data.format(dfs,st,True)
 		model = Sequential([ Bidirectional( LSTM( 64,  input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),
 			Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
 		model.compile(loss = 'sparse_categorical_crossentropy',optimizer = Adam(learning_rate = 1e-3),metrics = ['accuracy'])
 		model.fit(x,y,epochs = epochs,batch_size = 64,validation_split = .2,)
-		model.save('C:/Stocks/sync/models/model_' + setup_type)
+		model.save('C:/Stocks/sync/models/model_' + st)
 
 	def get_config(name):
 		s  = open("C:/Stocks/config.txt", "r").read()
@@ -510,23 +536,37 @@ class Data:
 		try: value = float(value)
 		except: pass
 		return value
-	def get_requirements(ticker, df, tf, setupType = None):
-		def setup_requirements(tf, setupType):
-			reqDolVol = 8000000
-			reqAdr = 3
-			reqpmDolVol = 1000000
-			if 'h' in tf:
-				reqAdr = 2.5
-				reqDolVol = 2500000
+	def get_requirements(ticker, df, st = ''):
+
+		def setup_requirements(st):
+
+
+			if 'd_' in st:
+				reqDolVol = 8000000
+				reqAdr = 3
 				reqpmDolVol = 1000000
-			if '1min' in tf:
+			if 'h_' in st:
+				reqAdr = 1.4
+				reqDolVol = 1500000
+				reqpmDolVol = 1000000
+			if '1min_' in st:
 				reqAdr = 0
 				reqDolVol = 10000
 				reqpmDolVol = 1000000
-
-
+			if 'w_' in st:
+				reqDolVol = 16000000
+				reqAdr = 5
+				reqpmDolVol = 1000000
 			return reqDolVol, reqAdr, reqpmDolVol
-		currentday = -1
+
+
+		def pm_dol_vol(df):
+			time = datetime.time(0,0,0)
+			today = datetime.date.today()
+			today = datetime.datetime.combine(today,time)
+			if df.index[-1] < today or Data.is_market_open == 1: return 0
+			return df.iat[-1,4] * df.iat[-1,0]
+
 		length = len(df)
 		if length < 5:
 			return False
@@ -538,25 +578,17 @@ class Data:
 			adr_l = length - 1
 		dolVol = []
 		for i in range(dol_vol_l):
-			dolVol.append(df.iat[currentday-1-i,3]*df.iat[currentday-1-i,4])
+			dolVol.append(df.iat[-2-i,3]*df.iat[-2-i,4])
 		dolVol = statistics.mean(dolVol)              
 		adr= []
 		for j in range(adr_l): 
-			high = df.iat[currentday-j-1,1]
-			low = df.iat[currentday-j-1,2]
+			high = df.iat[-j-2,1]
+			low = df.iat[-j-2,2]
 			val = (high/low - 1) * 100
 			adr.append(val)
 		adr = statistics.mean(adr)  
-		from Screener import Screener as screener
-		if	dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
-			pmvol = screener.get('current').loc[ticker]['Pre-market Volume']
-			pmprice = df.iat[currentday,0]
-			pmDolVol = pmvol * pmprice
-		else:
-			pmDolVol = 0
-		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(tf, setupType)
-		if((adr > reqAdr) and ((dolVol > reqDolVol) or (pmDolVol > reqpmDolVol))):
-			return True
+		reqDolVol, reqAdr, reqpmDolVol = setup_requirements(st)
+		if((adr > reqAdr) and ((dolVol > reqDolVol) or (pm_dol_vol(df) > reqpmDolVol))):return True
 		return False
 
 if __name__ == '__main__':

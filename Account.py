@@ -1,14 +1,3 @@
-
-
-
-#filter out non used logs of used ticker to speed up recalc traits
-
-
-#created self.queued changes which is all changes to log so that u can do tons of logs changes before it calcs isntead of one at a time
-
-
-#periodic pnl plot
-
 from Data import Data as data
 import pandas as pd
 import mplfinance as mpf
@@ -17,7 +6,6 @@ from matplotlib import pyplot as plt
 import PySimpleGUI as sg
 import matplotlib.ticker as mticker
 import datetime
-
 import PIL
 from PIL import Image
 import io
@@ -73,12 +61,16 @@ class Run:
 
 class Log:
 
-    def recalc(self,updated_log):
-        new_log = pd.concat([self.df_log[self.df_log['ticker'] != 'Deposit'], updated_log]).drop_duplicates(keep=False).sort_values(by='datetime', ascending = False)
-        self.df_log = updated_log.sort_values(by='datetime', ascending = False).reset_index(drop = True)
-        self.queued_recalcs = pd.concat([self.queued_recalcs,new_log]).reset_index(drop = True)
+    def queue(self,updated_log):
+        if not self.df_log.empty: 
+            deposits = self.df_log[self.df_log['ticker'] == 'Deposit']
+            new_log = pd.concat([self.df_log[self.df_log['ticker'] != 'Deposit'], updated_log]).drop_duplicates(keep=False).sort_values(by='datetime', ascending = False)
+            self.df_log = pd.concat([updated_log,deposits]).sort_values(by='datetime', ascending = False).reset_index(drop = True)
+            self.queued_recalcs = pd.concat([self.queued_recalcs,new_log]).reset_index(drop = True)
+        else:
+            self.df_log = updated_log
+            self.queued_recalcs = updated_log
         self.queued_recalcs.to_feather('C:/Stocks/local/account/queued_recalcs.feather')
-
         Log.update(self)
         self.df_log.to_feather(r"C:\Stocks\local\account\log.feather")
 
@@ -102,7 +94,7 @@ class Log:
         updated_log.iat[self.log_index,4] = setup
         self.log_index = None
         self.window['-log_table-'].update(select_rows=[])
-        Log.recalc(self,updated_log)
+        Log.queue(self,updated_log)
 
     def log(self):
         if self.init:
@@ -232,7 +224,7 @@ class Log:
             updated_log =  dfn
         else:
             raise Exception('no pull method created')
-        Log.recalc(self,updated_log)
+        Log.queue(self,updated_log)
 
 
 class Traits:
@@ -622,9 +614,10 @@ class Account:
             pnl = 0
             deposits = 0
         else:
-            index = data.findex(self.df_pnl,date_list[0])
-            bar = self.df_pnl.iloc[index]
+            index = data.findex(self.df_pnl,date_list[0]) 
             self.df_pnl = self.df_pnl[:index]
+
+            bar = self.df_pnl.iloc[-1]
             open_positions = bar['positions'].split(',')
             open_shares = bar['shares'].split(',')
             pos = []
