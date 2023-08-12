@@ -220,22 +220,23 @@ class Trainer:
 		i = bar[3]
 		p = pathlib.Path('C:/Stocks/local/trainer/charts') / (str(i) + '.png')
 		try:
-			_, axlist = mpf.plot(df, type='candle', volume=True,                           
-			style=mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r')), warn_too_much_data=100000,returnfig = True,figratio = (data.get_config('Trainer chart_aspect_ratio'),1),
-			figscale=data.get_config('Trainer chart_size'), panel_ratios = (5,1), title = title, tight_layout = True,axisoff=True)
+			_, axlist = mpf.plot(df, type = 'candle', volume=True, style = mpf.make_mpf_style(marketcolors = mpf.make_marketcolors(up = 'g', down = 'r')), warn_too_much_data=100000, returnfig = True, figratio = (data.get_config('Trainer chart_aspect_ratio'),1),
+			figscale = data.get_config('Trainer chart_size'), panel_ratios = (5,1), title = title, tight_layout = True,axisoff=True)
 			ax = axlist[0]
 			ax.set_yscale('log')
 			ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
 			plt.savefig(p, bbox_inches='tight',dpi = data.get_config('Trainer chart_dpi'))
-		except: shutil.copy(r'C:\Stocks\sync\files\blank.png',p)
+		except Exception as e: 
+			print(e)
+			shutil.copy(r'C:\Stocks\sync\files\blank.png',p)
 						
 	def save_training_data(self):
-		df1 = self.chart_info[self.i][0]
+		data = self.chart_info[self.i][0]
 		ticker = self.chart_info[self.i][1]
 		ii = 0
 		for s in self.current_setup_list:
 			df = pd.DataFrame()
-			df['dt'] = df1.index
+			df['dt'] = data.index
 			df['ticker'] = ticker
 			df['value'] = 0
 			df['required'] = 0
@@ -245,17 +246,16 @@ class Trainer:
 					index = bar[0]
 					df.iat[index,2] = 1
 					if index <= self.trainer_cutoff:
-						df2 = pd.DataFrame({ 'ticker':[ticker],'dt':[df1.index[index]], 'value':[1], 'required':[0]})
-						df = pd.concat([df,df2]).reset_index(drop = True)
+						add = pd.DataFrame({'ticker':[ticker],'dt':[data.index[index]], 'value':[1], 'required':[0]})
+						df = pd.concat([df,add]).reset_index(drop = True)
 			df = df[self.trainer_cutoff:]
 			if self.event == 'Skip No': df = df[df['value'] == 1]
 			if df.empty: continue
-			add = df[['ticker','dt','value','required']]
 			ident = data.get_config('Data identity')
 			path = 'C:/Stocks/sync/database/' + ident + '_' + s + '.feather'
-			try: df = pd.read_feather(path)
-			except FileNotFoundError: df = pd.DataFrame()
-			df = pd.concat([df,add]).reset_index(drop = True)
+			try: setup_df = pd.read_feather(path)
+			except FileNotFoundError: setup_df = pd.DataFrame()
+			df = pd.concat([setup_df,df[['ticker','dt','value','required']]]).reset_index(drop = True)
 			df.to_feather(path)
 
 	def click(self):
@@ -264,8 +264,7 @@ class Trainer:
 		if self.event == '-chart-':
 			x = self.values['-chart-'][0]
 			self.y = self.values['-chart-'][1]
-			chart_click = x - self.chart_edge_size
-			percent = chart_click/chart_size
+			percent = (x - self.chart_edge_size)/chart_size
 			self.selected_trainer_index = math.floor(len(df) * percent)
 			if self.selected_trainer_index <= -1: self.selected_trainer_index = 0
 			if self.selected_trainer_index >= len(df): self.selected_trainer_index = len(df) - 1
@@ -274,15 +273,14 @@ class Trainer:
 		else:
 			if self.event == 'right_button' and self.selected_trainer_index < len(df) - 1: self.selected_trainer_index += 1
 			elif self.event == 'left_button' and self.selected_trainer_index > 0: self.selected_trainer_index -= 1
-			self.y = self.chart_height - 80
-		
-		round_x = int((self.selected_trainer_index + 1)/(len(df)) * (self.x_size - (self.chart_edge_size * 2))) + self.chart_edge_size - int((chart_size/len(df))/2)
+			self.y = int ((self.chart_height/4)*3)
+		round_x = int((self.selected_trainer_index + 1)/len(df) * (self.x_size - (self.chart_edge_size * 2))) + self.chart_edge_size - int((chart_size/len(df))/2)
 		self.window['-chart-'].MoveFigure(self.select_line,round_x - self.select_line_x,0)
 		self.select_line_x = round_x
 
 	def log(self):
 		if self.event == 'center_button':
-			for i in range(len(self.current_setups)-1,-1,-1):
+			for i in range(len(self.current_setups) - 1,-1,-1):
 				if self.current_setups[i][0] == self.selected_trainer_index:
 					for k in range(2): self.window['-chart-'].MoveFigure(self.current_setups[i][2][k],5000,0)
 					del self.current_setups[i]
@@ -293,12 +291,12 @@ class Trainer:
 				setup = self.current_setup_list[i-1]
 			except IndexError: return
 			y = self.y - 50
-			if y < 10: y = 110
-			if y > self.chart_height - 400: y = self.chart_height - 400
-			text = self.window['-chart-'].draw_text(setup, (self.select_line_x,y) , font = None,color='black', angle=0, text_location='center')
-			line = self.window['-chart-'].draw_line((self.select_line_x,0), (self.select_line_x,self.chart_height), color='black', width=1)
+			if y < int (self.chart_height/4): y = int(self.chart_height/4)
+			if y > int ((self.chart_height/4)*3): y = int ((self.chart_height/4)*3)
+			text = self.window['-chart-'].draw_text(setup, (self.select_line_x,y), font = None, color = 'black', angle = 0, text_location = 'center')
+			line = self.window['-chart-'].draw_line((self.select_line_x,0), (self.select_line_x,self.chart_height), color = 'black', width = 1)
 			self.current_setups.append([self.selected_trainer_index,setup,[line,text]])
-			self.y -= 35
+			self.y -= 30
 
 if __name__ == '__main__':
 	Trainer.run(Trainer)

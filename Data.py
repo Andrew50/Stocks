@@ -27,8 +27,8 @@ class Data:
 			else: base_tf = '1min'
 			try: df = feather.read_feather(Data.data_path(ticker,tf))
 			except FileNotFoundError: df = pd.DataFrame()
+			print(df)
 			if df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1])): 
-				
 				if df.empty or not (base_tf == '1d' and Data.is_pre_market(dt)):
 					try: add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('Ticker').loc[ticker]['Exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
 					except (websocket._exceptions.WebSocketAddressException, KeyError): raise TimeoutError
@@ -37,7 +37,6 @@ class Data:
 					add.index = add.index + pd.Timedelta(hours=4)
 					if df.empty or add.index[0] > df.index[-1]: df = add
 					else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
-				
 			if dt != None and not Data.is_pre_market(dt):
 				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
 				except IndexError: raise TimeoutError
@@ -53,7 +52,7 @@ class Data:
 					
 			df['ticker'] = ticker
 			return df.dropna()[-bars:]
-		except TimeoutError: return pd.DataFrame()
+		except IndexError: return pd.DataFrame()
 
 	def findex(df,dt):
 		dt = Data.format_date(dt)

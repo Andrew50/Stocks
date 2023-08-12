@@ -6,7 +6,7 @@ import os
 #print((data.get(tf = 'd',dt = datetime.datetime(2023,8,10,9,15),bars = 100)).to_string())
 #df_traits = pd.read_feather('C:/Stocks/local/account/traits.feather')
 
-print(data.get(dt = datetime.datetime(2023,8,10,9,15)))
+print(data.get(tf = '2min', dt = datetime.datetime(2022,8,10,9,45)))
 
 #df = pd.read_feather('C:/Stocks/sync/files/full_scan.feather')
 #print(df.columns)
