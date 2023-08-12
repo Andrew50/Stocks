@@ -2,6 +2,9 @@
 	identity = laptop
 	cpu_cores = 8
 	data_drive_letter = C
+-Screener
+	active_setup_list = d_EP,d_NEP,d_P,d_F,d_MR,d_NP,d_NF
+	threshold = 25
 -Study 
 	ui_scale = 2.5
 	chart_size = .49
@@ -18,17 +21,18 @@
 -Log
 	ui_scale = 5
 -Traits:
-	ui_scale = 4
-	chart_size = 3
-	chart_aspect_ratio = 2
+	ui_scale = 3.5
+	chart_size = .84
+	chart_aspect_ratio = 2.15
 	chart_dpi = 330
+	marker_size = 350
 -Account:
 	ui_scale = 4
 	chart_size = 1.1
-	chart_aspect_ratio = 2
+	chart_aspect_ratio = 1.9
 	chart_dpi = 330
 -Plot
 	ui_scale = 4
-	chart_size = 1.95
-	chart_aspect_ratio = 2
+	chart_size = .62
+	chart_aspect_ratio = 1.8
 	chart_dpi = 330
