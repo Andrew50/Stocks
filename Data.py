@@ -489,8 +489,7 @@ class Data:
 			if name.split(' ')[1] in line: break
 		return float(line.split('=')[1].replace(' ',''))
 if __name__ == '__main__':
-	#Data.update()
-	Data.consolidate_setups()
+	Data.update()
 
 
 
