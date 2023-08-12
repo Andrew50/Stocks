@@ -159,7 +159,6 @@ class Trainer:
 		elif self.current_menu == 'Validator': self.window['-counter-'].update(f'{self.i + 1} of {len(self.setup_df)}')
 
 	def preload(self):
-		if self.current_menu in ['Tester','Manual']: return
 		if self.current_menu in ['Trainer','Validator']:
 			if self.i == 0: index_list = list(range(10))
 			else: index_list = [self.i + 9]
@@ -176,8 +175,7 @@ class Trainer:
 							if data.get_requirements(ticker, df, self.current_setup): break
 					title = ''
 				elif self.current_menu == 'Validator':
-					if i >= len(self.setup_df):  
-						break
+					if i >= len(self.setup_df): break
 					ticker = self.setup_df.iat[i,0]
 					dt = self.setup_df.iat[i,1]
 					df = data.get(ticker,self.current_setup.split('_')[0],dt,250)
@@ -190,13 +188,12 @@ class Trainer:
 			if self.i == 0: index_list = list(range(0,self.sub_preload_amount*6,self.sub_preload_amount))
 			elif self.i%self.sub_preload_amount == 0: index_list = [self.i + self.sub_preload_amount*5]
 			else: run = False
-
 			if run:
 				arglist = [[list(range(i,i+self.sub_preload_amount)),self.current_tf,self.current_setup,self.full_ticker_list] for i in index_list]
-				for arg in arglist:
-					self.chart_info.append (self.pool.apply_async(Trainer.create_tune, args = (arg)))
+				for arg in arglist: self.chart_info.append (self.pool.apply_async(Trainer.create_tune, args = (arg)))
+				
 	def create_tune(i_list,current_tf,st,full_ticker_list):
-		model = load_model('C:/Stocks/sync/models/model_' + st)
+		model = data.load_model(st)
 		info_list = []
 		ii = 0
 		while True:
@@ -204,9 +201,8 @@ class Trainer:
 			dfs = [data.get(ticker,tf = current_tf)]
 			if dfs[0].empty: continue
 			x,_,info = data.format(dfs,True)
-
 			setups = data.score(x,info,dfs,st,model,False)
-			for ticker,dt,score,df in setups:
+			for ticker,_,score,df in setups:
 				index = 300
 				if index >= len(df): index = len(df) - 1
 				df = df[-index:]
@@ -214,16 +210,6 @@ class Trainer:
 				i = i_list[ii]
 				Trainer.plot([df,ticker,title,i])
 				info_list.append([df,ticker,title,i])
-				
-			
-			#	Screener.log(ticker,score,dt,tf,path,st,df)
-			#setups = data.score(df,st,True,.25, model)
-			#for ticker, dt, score, df in setups:
-			#	title = str(round(100*score))
-			#	i = i_list[ii]
-			#	df = df[-300:]
-			#	Trainer.plot([df,ticker,title,i])
-			#	info_list.append([df,ticker,title,i])
 				ii += 1
 				if ii == len(i_list):
 					return info_list
