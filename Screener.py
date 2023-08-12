@@ -1,35 +1,125 @@
-
-
-#organize so screener shit on top scan on bottom
-
-
-#rename columns to lowercase and standards
-#get rid of ticker with / and . or whaetver
-
-from discordwebhook import Discord
-import pathlib
-import time 
-import selenium
-import selenium.webdriver as webdriver
-from selenium.webdriver.firefox.options import Options 
-from selenium.webdriver.common.by import By 
+import pathlib, time, selenium, datetime, os, math
 import pandas as pd
-import datetime
-from Study import Study as study
-import statistics
-from Data import Data as data
+import numpy as np
 from tqdm import tqdm
+from Data import Data as data
+from Study import Study as study
 import mplfinance as mpf
-import os
+from discordwebhook import Discord
+from multiprocessing import Pool
+import selenium.webdriver as webdriver
+from selenium.webdriver.common.by import By 
 from tensorflow.keras.models import load_model
-
+from selenium.webdriver.firefox.options import Options 
 
 class Screener:
+
+	def run(dt = None, ticker = None, tf = 'd',browser = None, fpath = None):
+		with Pool(int(data.get_config('Data cpu_cores'))) as pool:
+			dt = data.format_date(dt)
+			path = 0
+			if ticker == None:
+				if dt == None: 
+					path = 0
+					ticker_list = Screener.get('full').index.to_list()
+				else:
+					if 'd' in tf or 'w' in tf: 
+						ticker_list, browser = Screener.get('current',True,browser)
+						#ticker_list = ticker_list[:200]
+						path = 1
+					else: 
+						ticker_list, browser = Screener.get('intraday',True,browser)
+						path = 2
+			else:
+				path = 1
+				if not isinstance(ticker,list): ticker = [ticker]
+				ticker_list = ticker
+			if fpath != None: path = fpath
+			if path == 1: 
+				try: os.remove(r"C:\Stocks\local\study\current_setups.feather")
+				except FileNotFoundError: pass
+			df = pd.DataFrame()
+			df['ticker'] = ticker_list
+			df['dt'] = dt
+			df['tf'] = tf
+			num_dfs = int(data.get_config('Data cpu_cores'))
+			values = []
+			dfs = []
+			s = math.ceil(len(df) / num_dfs)
+			for i in range(num_dfs):
+				d = df[int(s*i):int(s*(i+1))].reset_index(drop = True)
+				if not d.empty: values.append(pool.apply_async(data.create_arrays,args = ([d]))) 
+			model_list = []
+			for st in data.get_config('Screener active_setup_list').split(','):
+				if not tf in st: continue
+				model_list.append([st,data.load_model(st)])
+			x = np.concatenate([bar.get()[0] for bar in values])
+			info = np.concatenate([bar.get()[2] for bar in values])
+			dfs = []
+			for bar in values:
+				for df in bar.get()[3]: 
+					dfs.append(df)
+			threshold = data.get_config('Screener threshold')
+			for st, model in model_list:
+				setups = data.score(x,info,dfs,st,model)
+
+				for ticker,dt,score,df in setups:
+					Screener.log(ticker,score,dt,tf,path,st,df)
+
+				#scores = model.predict(x)[:,1]
+				#for i in range(len(scores)):
+				#	score = round(scores[i]*100)
+				#	if score >= threshold:
+				#		bar = info[i]
+				#		ticker = bar[0]
+				#		dt = bar[1]
+				#		key = bar[2]
+				#		df = dfs[key]
+				#		try: index = data.findex(df,dt) + 1
+				#		except IndexError: continue
+				#		if not index >= len(df): df = df[:data.findex(df,dt) + 1]
+				#		if data.get_requirements(ticker, df,st): Screener.log(ticker,score,dt,tf,path,st,df)
+
+	def screen(tickers,dt,tf):
+		if len(tickers) == 0: return
+		if dt == None: use_whole_df = True
+		else: use_whole_df = False
+		dfs = []
+		pbar = tqdm(total = len(tickers))
+		for ticker in tickers:
+			df = data.get(ticker,tf,dt)
+			if not df.empty: dfs.append(df)
+			pbar.update(1)
+		pbar.close()
+		x, _, info = data.format(dfs,use_whole_df)
+		return [x, info, dfs]
+
+	def log(ticker,z, dt, tf,  path, setup_type,df):
+		if path == 3: print(f'{ticker} {dt} {z} {setup_type}')
+		elif path == 2:
+			ourpath = pathlib.Path("C:/Stocks/local/screener")/ 'intraday.png'
+			df = df[-100:]
+			mpf.plot(df, type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {setup_type}, {z}, {tf}', style=mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r')), savefig=ourpath)
+			discordintraday = Discord(url="https://discord.com/api/webhooks/1071667193709858847/qwHcqShmotkEPkml8BSMTTnSp38xL1-bw9ESFRhBe5jPB9o5wcE9oikfAbt-EKEt7d3c")
+			discordintraday.post(file={"intraday": open('local/screener/intraday.png', "rb")})
+		elif path == 1:
+			d = r"C:\Stocks\local\study\current_setups.feather"
+			try: setups = pd.read_feather(d)
+			except: setups = pd.DataFrame()
+			add = pd.DataFrame({'ticker': [ticker],'dt':[dt],'st': [setup_type],'z':[z]})
+			setups = pd.concat([setups,add]).reset_index(drop = True)
+			setups.to_feather(d)
+		elif path == 0:
+			d = r"C:\Stocks\local\study\historical_setups.feather"
+			try: setups = pd.read_feather(d)
+			except: setups = pd.DataFrame()
+			add = pd.DataFrame({'ticker':[ticker], 'dt': [dt],'st': [setup_type], 'z': [z], 'sub_st':[setup_type], 'pre_annotation': [""], 'post_annotation': [""] })
+			setups = pd.concat([setups,add]) .reset_index(drop = True)
+			setups.to_feather(d)
 
 	def get(type = 'full',  refresh = False, browser = None):
 
 		def start_firefox():
-			
 			options = Options()
 			options.binary_location = r"C:\Program Files\Mozilla Firefox\firefox.exe"
 			options.headless = True
@@ -40,8 +130,7 @@ class Screener:
 			browser = webdriver.Firefox(options=options, executable_path=FireFoxDriverPath)
 			browser.implicitly_wait(7)
 			browser.set_window_size(2560, 1440)
-			url = "https://www.tradingview.com/screener/"
-			browser.get(url)
+			browser.get("https://www.tradingview.com/screener/")
 			time.sleep(1.5)
 			browser.find_element(By.XPATH, '//button[@aria-label="Open user menu"]').click()
 			time.sleep(1)
@@ -50,9 +139,9 @@ class Screener:
 			browser.find_element(By.XPATH, '//button[@class="emailButton-nKAw8Hvt light-button-bYDQcOkp with-start-icon-bYDQcOkp variant-secondary-bYDQcOkp color-gray-bYDQcOkp size-medium-bYDQcOkp typography-regular16px-bYDQcOkp"]').click()
 			browser.find_element(By.XPATH, '//input[@name="id_username"]').send_keys("cs.benliu@gmail.com")
 			time.sleep(0.5)
-			password = browser.find_element(By.XPATH, '//input[@name="id_password"]').send_keys("tltShort!1")
+			browser.find_element(By.XPATH, '//input[@name="id_password"]').send_keys("tltShort!1")
 			time.sleep(0.5)
-			login_button = browser.find_element(By.XPATH, '//button[@class="submitButton-LQwxK8Bm button-D4RPB3ZC size-large-D4RPB3ZC color-brand-D4RPB3ZC variant-primary-D4RPB3ZC stretch-D4RPB3ZC"]').click()
+			browser.find_element(By.XPATH, '//button[@class="submitButton-LQwxK8Bm button-D4RPB3ZC size-large-D4RPB3ZC color-brand-D4RPB3ZC variant-primary-D4RPB3ZC stretch-D4RPB3ZC"]').click()
 			time.sleep(3)
 			browser.refresh();
 			time.sleep(5)
@@ -73,35 +162,28 @@ class Screener:
 			return browser
 
 		def get_full(refresh):
-			df1 = pd.read_feather("C:/Stocks/sync/full_scan.feather")
-			if not data.indentify() == 'desktop' or not refresh: return df1.set_index('Ticker')
-			df2 = pd.read_feather("C:/Screener/sync/current_scan.feather")
-			df3 = pd.concat([df1,df2]).drop_duplicates(subset = ['Ticker'])		
+			df1 = pd.read_feather("C:/Stocks/sync/files/full_scan.feather")
+			if not refresh: return df1['ticker'].tolist()
+			df2 = pd.read_feather("C:/Stocks/sync/files/current_scan.feather")
+			df3 = pd.concat([df1,df2]).drop_duplicates(subset = ['ticker'])		
+			not_in_current = (pd.concat([df3,df2]).drop_duplicates(subset = ['ticker'],keep = False))['ticker'].tolist()
 			removelist = []
-			full = df3['Ticker'].to_list()
-			current = df1['Ticker'].to_list()
-			for ticker in full:
-				if ticker not in current:
-					ticker = str(ticker)
-					if not os.path.exists(data.data(ticker,'1min')):
-						removelist.append(ticker)
-			df3 = df3.set_index('Ticker')
-			for ticker in removelist:
-				ticker = str(ticker)
-				df3 = df3.drop(index = ticker)
-			try: df3 = df3.reset_index()
-			except: pass
-			df3.to_feather("C:/Screener/sync/full_ticker_list.feather")
-			return df3.set_index('Ticker')
+			for ticker in not_in_current:
+				if pd.isna(ticker) or not os.path.exists('C:/Stocks/local/data/1min/' + ticker + '.feather'):
+					removelist.append(ticker)
+			df3 = df3.set_index('ticker',drop = True)
+			df3.drop(removelist, inplace = True)
+			df3 = df3.reset_index()
+			df3.to_feather("C:/Stocks/sync/files/full_scan.feather")
+			return df3['ticker'].tolist()
 
 		def get_current(refresh,browser = None):
 			if not refresh:
-				try: return pd.read_feather("C:/Stocks/sync/files/current_scan.feather").set_index('Ticker')
+				try: return pd.read_feather("C:/Stocks/sync/files/current_scan.feather")['Ticker'].tolist(), browser
 				except FileNotFoundError: pass
-			today = str(datetime.date.today())
+			
 			try:
-				if(browser == None):
-					browser = start_firefox()
+				if(browser == None): browser = start_firefox()
 				time.sleep(0.5) 
 				browser.find_element(By.XPATH, '//div[@data-name="screener-filter-sets"]').click()
 				time.sleep(0.25)
@@ -109,221 +191,52 @@ class Screener:
 				time.sleep(0.25)
 				browser.find_element(By.XPATH, '//div[@data-field="relative_volume_intraday.5"]').click()
 				browser.find_element(By.XPATH, '//div[@data-name="screener-export-data"]').click()
-			except TimeoutError as e:
-				print(e)
-				print('manual csv fetch required')
+			except: print('manual csv fetch required')
 			found = False
+			today = str(datetime.date.today())
 			while True:
-				path = r"C:\Downloads"
+				path = r'C:/Downloads/'
 				dir_list = os.listdir(path)
 				for direct in dir_list:
 					if today in direct:
-						downloaded_file = path + "\\" + direct
+						downloaded_file = path + direct
 						found = True
+						time.sleep(2)
 						break
 				if found:
 					break
-			screener_data = pd.read_csv(downloaded_file)
-			os.remove(downloaded_file)
-			for i in range(len(screener_data)):
-				if str(screener_data.iloc[i]['Exchange']) == "NYSE ARCA": screener_data.at[i, 'Exchange'] = "AMEX"
-				if screener_data.iloc[i]['Pre-market Change'] is None: screener_data.at[i, 'Pre-market Change'] = 0
-			screener_data.to_feather(r"C:\Screener\sync\current_scan.feather")
-			return screener_data.set_index('Ticker'), browser
+			df = pd.read_csv(downloaded_file)
+			#os.remove(downloaded_file)
+			for i in range(len(df)-1,-1,-1):
+				bar = df.loc[i]
+				ticker = bar['Ticker']
+				if  isinstance(ticker,str) and '.' not in ticker and '/' not in ticker and not ticker == 'nan':
+					if str(bar['Exchange']) == "NYSE ARCA": df.iloc[i]['Exchange'] = "AMEX"
+				else: df = df.drop(i)
+			df = df.drop('Description', axis = 1)
+			df = df.fillna(0)
+			df = df.rename(columns={'Ticker':'ticker','Exchange':'exchange','Pre-market Change':'pm change','Pre-market Volume':'pm volume','Relative Volume at Time':'rvol'})
+			df.reset_index(drop = True).to_feather(r"C:\Stocks\sync\files\current_scan.feather")
+			return df['ticker'].tolist() , browser
 
 		def get_intraday(browser = None):
 			while True:
 				try:
 					df, browser = get_current(True,browser)
 					break
-				except:
+				except (selenium.common.exceptions.NoSuchElementException, AttributeError):
 					try: browser.find_element(By.XPATH, '//button[@class="close-button-FuMQAaGA closeButton-zCsHEeYj defaultClose-zCsHEeYj"]').click()
-					except AttributeError: print('tried closing popup')
-					except selenium.common.exceptions.NoSuchElementException: print('tried closing popup')
-			length = 60
+					except (selenium.common.exceptions.NoSuchElementException, AttributeError): pass
 			df = df.sort_values('Relative Volume at Time', ascending=False)
-			left = 0
-			right =  length
-			df = df[left:right].reset_index(drop = True).set_index('Ticker')
-			return df, browser
+			df = df[:60].reset_index(drop = True)
+			return df['Ticker'].tolist(), browser
 
-		if type == 'full':
-			return get_full(refresh)
-		elif type == 'current':
-			return get_current(refresh,browser)
-		elif type == 'intraday':
-			return get_intraday(browser)
-			
-	def run(date = None,days = 1, ticker = None, tf = 'd',browser = None, fpath = None):
-		path = 0
-		data.consolidate_setups()
-		if ticker == None:
-			ticker_list = Screener.get('full').index.tolist()
-		elif type(ticker) is str:
-			path = 1
-			ticker_list = [ticker]
-		else:
-			path = 1
-			ticker_list = ticker
-		if date == '0':
-			if tf == 'd' or tf == 'w' or tf == 'm': path = 1
-			else: path = 2
-			date_list = [date]
-		else:
-			sample = data.get(tf)
-			if date == None: date_list = sample.index.tolist()
-			else:
-				path = 1
-				start_index = data.findex(sample,date)  
-				end_index = start_index + days
-				date_list = sample[start_index:end_index].index.tolist()
-		if fpath != None:
-			path = fpath
-		length = len(ticker_list)*len(date_list)
-		container = []
-		print(f'{length} items')
-		for ticker in ticker_list:
-			for date in date_list:
-				container.append([ticker, date, tf , path])
-			
-		num_packages = length // 10000
-		min_packages = data.get_nodes()
-		if num_packages < min_packages: num_packages = min_packages
-		ii = 0
-		package = []
-		for _ in range(num_packages):
-			package.append([])
-		for bar in container:
-			package[ii].append(bar)
-			ii += 1
-			if ii == num_packages:
-				ii = 0
-		if length == 1:
-			Screener.screen(package[0])
-		else:
-			data.pool(Screener.screen, package)
-		data.consolidate_setups()
-
-	def screen(container):
-		setuplist = ['d_EP','d_NEP','d_P', 'd_F', 'd_MR', 'd_NP','d_NF']
-		threshold = .25
-		model_list = []
-		tf = container[0][2]
-		for setup in setuplist:
-			if tf in setup:
-				model = load_model('C:/Stocks/sync/models/model_' + str(setup))
-				model_list.append([model, str(setup)])
-		dfs = []
-		tickers = []
-		for bar in container:
-			ticker = bar[0]
-			date = bar[1]
-			tf = bar[2]
-			path = bar[3]
-			df = data.get(ticker,tf,date,200)
-			dolVol, adr, pmDolVol = Screener.get_requirements(df,-1,path,ticker)
-			if ((dolVol > 8000000 or pmDolVol  > .5 * 1000000) and adr > 2.8 and tf == 'd'):
-				dfs.append(df)
-				tickers.append(ticker)
-		for bar in model_list:
-			model = bar[0]
-			setup_type = bar[1]
-			setups = data.score(dfs,tickers,setup_type,model,threshold)
-			for ticker, z, df in setups:
-				Screener.log(ticker,z,df,tf,path,setup_type)
-  
-	def get_requirements(df,currentday,path,ticker):
-		length = len(df)
-		if length < 5:
-			return 0,0,0
-		if path == 3:
-			return 1000000 , 100000 , 1000000
-		dol_vol_l = 15
-		adr_l = 15
-		if dol_vol_l > length - 1:
-			dol_vol_l = length - 1
-		if adr_l > length - 1:
-			adr_l = length - 1
-		dolVol = []
-		for i in range(dol_vol_l):
-			dolVol.append(df.iat[currentday-1-i,3]*df.iat[currentday-1-i,4])
-		dolVol = statistics.mean(dolVol)              
-		adr= []
-		for j in range(adr_l): 
-			high = df.iat[currentday-j-1,1]
-			low = df.iat[currentday-j-1,2]
-			val = (high/low - 1) * 100
-			adr.append(val)
-		adr = statistics.mean(adr)  
-		if path == 1 and dolVol < 8000000 and abs(df.iat[currentday,0] / df.iat[currentday-1,3] - 1) > .05:
-			pmvol = Screener.get('current').loc[ticker]['Pre-market Volume']
-			pmprice = df.iat[currentday,0]
-			pmDolVol = pmvol * pmprice
-		else:
-			pmDolVol = 0
-		return dolVol, adr, pmDolVol
-
-	def log(ticker,z, df, tf,  path, setup_type):
-		z = round(z * 100)
-		if path == 3:
-			print(f'{ticker} {df.index[-1]} {z} {setup_type} ')
-		elif path == 2:
-			mc = mpf.make_marketcolors(up='g',down='r')
-			s  = mpf.make_mpf_style(marketcolors=mc)
-			ourpath = pathlib.Path("C:/Screener/tmp")/ 'test.png'
-			df = df[-100:]
-			#df.set_index('datetime', inplace = True)
-			mpf.plot(df, type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {st}, {z}, {tf}', style=s, savefig=ourpath)
-			discordintraday = Discord(url="https://discord.com/api/webhooks/1071667193709858847/qwHcqShmotkEPkml8BSMTTnSp38xL1-bw9ESFRhBe5jPB9o5wcE9oikfAbt-EKEt7d3c")
-
-			discordintraday.post(file={"test": open('tmp/test.png', "rb")})
-		elif path == 1:
-			d = "C:/Stocks/local/screener/subsetups/current_" + str(os.getpid()) + ".feather"
-			try: setups = pd.read_feather(d)
-			except: setups = pd.DataFrame()
-			add =pd.DataFrame({'ticker': [ticker],
-					'datetime':[df.index[-1]],
-					'setup': [setup_type],
-					'z':[z]})
-			setups = pd.concat([setups,add]).reset_index(drop = True)
-			setups.to_feather(d)
-		elif path == 0:
-			d = "C:/Stocks/local/screener/subsetups/historical_" + str(os.getpid()) + ".feather"
-			try: setups = pd.read_feather(d)
-			except: setups = pd.DataFrame()
-			add = pd.DataFrame({'ticker':[ticker],
-						'datetime': [df.index[-1]],
-						'setup': [setup_type],
-						'z': [z],
-						'sub_setup':[setup_type],
-						'pre_annotation': [""],
-						'post_annotation': [""]
-						})
-			setups = pd.concat([setups,add]) .reset_index(drop = True)
-			setups.to_feather(d)
-		
+		if type == 'full': return get_full(refresh)
+		elif type == 'current': return get_current(refresh,browser)
+		elif type == 'intraday': return get_intraday(browser)
 
 if __name__ == '__main__':
-	
-	if   ((datetime.datetime.now().hour) < 5 or (datetime.datetime.now().hour == 5 and datetime.datetime.now().minute < 40)) and not data.identify == 'laptop':
-		Screener.run('0')
-		study.current(study,True)
-		browser = Screener.get.startFirefoxSession()
-		while datetime.datetime.now().hour < 13:
-			Screener.run(tf = '1min', date = '0',browser = browser)
-	else:
-		Screener.run(ticker = ['ENPH'],fpath = 0)
-
-
-
-		i = 0
-		path = "C:/Screener/tmp/subtickerlists/"
-		while True:
-			print('enter cycle length (x50)')
-			cycles = int(input())
-			for _ in range(cycles):
-				dir_list = os.listdir(path)
-				direct = path + dir_list[0]
-				tickers = pd.read_feather(direct)['Ticker'].to_list()
-				Screener.queue(ticker = tickers,fpath = 0)
-				os.remove(direct)
+	Screener.run('current')
+	study.run(study,True)
+	#Screener.run(ticker = 'ENPH',fpath = 1)
+	#study.run(study,True)

@@ -189,7 +189,7 @@ class TvDatafeed:
         self,
         symbol: str,
         exchange: str = "NSE",
-        interval: Interval = Interval.in_daily,
+        interval: str = '1D',
         n_bars: int = 10,
         fut_contract: int = None,
         extended_session: bool = False,
@@ -211,8 +211,9 @@ class TvDatafeed:
             symbol=symbol, exchange=exchange, contract=fut_contract
         )
 
-        interval = interval.value
-
+        #interval = interval.value
+        if interval == '1min': interval = '1'
+        if interval == 'd': interal = '1D'
         self.__create_connection()
 
         self.__send_message("set_auth_token", [self.token])
