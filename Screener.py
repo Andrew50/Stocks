@@ -1,7 +1,6 @@
 import pathlib, time, selenium, datetime, os, math
 import pandas as pd
 import numpy as np
-from tqdm import tqdm
 from Data import Data as data
 from Study import Study as study
 import mplfinance as mpf
@@ -9,7 +8,6 @@ from discordwebhook import Discord
 from multiprocessing import Pool
 import selenium.webdriver as webdriver
 from selenium.webdriver.common.by import By 
-from tensorflow.keras.models import load_model
 from selenium.webdriver.firefox.options import Options 
 
 class Screener:
@@ -21,11 +19,10 @@ class Screener:
 			if ticker == None:
 				if dt == None: 
 					path = 0
-					ticker_list = Screener.get('full').index.to_list()
+					ticker_list = Screener.get('full')
 				else:
 					if 'd' in tf or 'w' in tf: 
 						ticker_list, browser = Screener.get('current',True,browser)
-						#ticker_list = ticker_list[:200]
 						path = 1
 					else: 
 						ticker_list, browser = Screener.get('intraday',True,browser)
@@ -44,90 +41,48 @@ class Screener:
 			df['tf'] = tf
 			num_dfs = int(data.get_config('Data cpu_cores'))
 			values = []
-			dfs = []
 			s = math.ceil(len(df) / num_dfs)
 			for i in range(num_dfs):
 				d = df[int(s*i):int(s*(i+1))].reset_index(drop = True)
 				if not d.empty: values.append(pool.apply_async(data.create_arrays,args = ([d]))) 
-			model_list = []
-			for st in data.get_config('Screener active_setup_list').split(','):
-				if not tf in st: continue
-				model_list.append([st,data.load_model(st)])
+			model_list = [data.load_model(st) for st in data.get_config('Screener active_setup_list').split(',') if tf in st]
 			x = np.concatenate([bar.get()[0] for bar in values])
 			info = np.concatenate([bar.get()[2] for bar in values])
 			dfs = []
 			for bar in values:
-				for df in bar.get()[3]: 
-					dfs.append(df)
-			threshold = data.get_config('Screener threshold')
+				for df in bar.get()[3]: dfs.append(df)
 			for st, model in model_list:
 				setups = data.score(x,info,dfs,st,model)
-
 				for ticker,dt,score,df in setups:
 					Screener.log(ticker,score,dt,tf,path,st,df)
-
-				#scores = model.predict(x)[:,1]
-				#for i in range(len(scores)):
-				#	score = round(scores[i]*100)
-				#	if score >= threshold:
-				#		bar = info[i]
-				#		ticker = bar[0]
-				#		dt = bar[1]
-				#		key = bar[2]
-				#		df = dfs[key]
-				#		try: index = data.findex(df,dt) + 1
-				#		except IndexError: continue
-				#		if not index >= len(df): df = df[:data.findex(df,dt) + 1]
-				#		if data.get_requirements(ticker, df,st): Screener.log(ticker,score,dt,tf,path,st,df)
-
-	def screen(tickers,dt,tf):
-		if len(tickers) == 0: return
-		if dt == None: use_whole_df = True
-		else: use_whole_df = False
-		dfs = []
-		pbar = tqdm(total = len(tickers))
-		for ticker in tickers:
-			df = data.get(ticker,tf,dt)
-			if not df.empty: dfs.append(df)
-			pbar.update(1)
-		pbar.close()
-		x, _, info = data.format(dfs,use_whole_df)
-		return [x, info, dfs]
 
 	def log(ticker,z, dt, tf,  path, setup_type,df):
 		if path == 3: print(f'{ticker} {dt} {z} {setup_type}')
 		elif path == 2:
-			ourpath = pathlib.Path("C:/Stocks/local/screener")/ 'intraday.png'
-			df = df[-100:]
-			mpf.plot(df, type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {setup_type}, {z}, {tf}', style=mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r')), savefig=ourpath)
-			discordintraday = Discord(url="https://discord.com/api/webhooks/1071667193709858847/qwHcqShmotkEPkml8BSMTTnSp38xL1-bw9ESFRhBe5jPB9o5wcE9oikfAbt-EKEt7d3c")
-			discordintraday.post(file={"intraday": open('local/screener/intraday.png', "rb")})
+			mpf.plot(df[-100:], type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {setup_type}, {z}, {tf}', style=mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r')), savefig = pathlib.Path("C:/Stocks/local/screener")/ 'intraday.png')
+			Discord(url="https://discord.com/api/webhooks/1071667193709858847/qwHcqShmotkEPkml8BSMTTnSp38xL1-bw9ESFRhBe5jPB9o5wcE9oikfAbt-EKEt7d3c").post(file={"intraday": open('local/screener/intraday.png', "rb")})
 		elif path == 1:
 			d = r"C:\Stocks\local\study\current_setups.feather"
 			try: setups = pd.read_feather(d)
 			except: setups = pd.DataFrame()
-			add = pd.DataFrame({'ticker': [ticker],'dt':[dt],'st': [setup_type],'z':[z]})
-			setups = pd.concat([setups,add]).reset_index(drop = True)
+			setups = pd.concat([setups,pd.DataFrame({'ticker': [ticker],'dt':[dt],'st': [setup_type],'z':[z]})]).reset_index(drop = True)
 			setups.to_feather(d)
 		elif path == 0:
 			d = r"C:\Stocks\local\study\historical_setups.feather"
 			try: setups = pd.read_feather(d)
 			except: setups = pd.DataFrame()
-			add = pd.DataFrame({'ticker':[ticker], 'dt': [dt],'st': [setup_type], 'z': [z], 'sub_st':[setup_type], 'pre_annotation': [""], 'post_annotation': [""] })
-			setups = pd.concat([setups,add]) .reset_index(drop = True)
+			setups = pd.concat([setups,pd.DataFrame({'ticker':[ticker], 'dt': [dt],'st': [setup_type], 'z': [z], 'sub_st':[setup_type], 'pre_annotation': [""], 'post_annotation': [""] })]) .reset_index(drop = True)
 			setups.to_feather(d)
 
-	def get(type = 'full',  refresh = False, browser = None):
+	def get(type = 'full', refresh = False, browser = None):
 
 		def start_firefox():
 			options = Options()
 			options.binary_location = r"C:\Program Files\Mozilla Firefox\firefox.exe"
 			options.headless = True
-			user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0'
-			FireFoxDriverPath = os.path.join(os.getcwd(), 'Drivers', 'geckodriver.exe')
 			FireFoxProfile = webdriver.FirefoxProfile()
-			FireFoxProfile.set_preference("General.useragent.override", user_agent)
-			browser = webdriver.Firefox(options=options, executable_path=FireFoxDriverPath)
+			FireFoxProfile.set_preference("General.useragent.override", 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0')
+			browser = webdriver.Firefox(options=options, executable_path=os.path.join(os.getcwd(), 'Drivers', 'geckodriver.exe'))
 			browser.implicitly_wait(7)
 			browser.set_window_size(2560, 1440)
 			browser.get("https://www.tradingview.com/screener/")
@@ -143,7 +98,7 @@ class Screener:
 			time.sleep(0.5)
 			browser.find_element(By.XPATH, '//button[@class="submitButton-LQwxK8Bm button-D4RPB3ZC size-large-D4RPB3ZC color-brand-D4RPB3ZC variant-primary-D4RPB3ZC stretch-D4RPB3ZC"]').click()
 			time.sleep(3)
-			browser.refresh();
+			browser.refresh()
 			time.sleep(5)
 			browser.find_element(By.XPATH, '//div[@data-name="screener-field-sets"]').click()
 			time.sleep(0.1)
@@ -179,11 +134,10 @@ class Screener:
 
 		def get_current(refresh,browser = None):
 			if not refresh:
-				try: return pd.read_feather("C:/Stocks/sync/files/current_scan.feather")['Ticker'].tolist(), browser
+				try: return pd.read_feather("C:/Stocks/sync/files/current_scan.feather")['ticker'].tolist(), browser
 				except FileNotFoundError: pass
-			
 			try:
-				if(browser == None): browser = start_firefox()
+				if browser == None: browser = start_firefox()
 				time.sleep(0.5) 
 				browser.find_element(By.XPATH, '//div[@data-name="screener-filter-sets"]').click()
 				time.sleep(0.25)
@@ -201,12 +155,12 @@ class Screener:
 					if today in direct:
 						downloaded_file = path + direct
 						found = True
-						time.sleep(2)
+						time.sleep(1)
 						break
 				if found:
 					break
 			df = pd.read_csv(downloaded_file)
-			#os.remove(downloaded_file)
+			os.remove(downloaded_file)
 			for i in range(len(df)-1,-1,-1):
 				bar = df.loc[i]
 				ticker = bar['Ticker']
@@ -222,14 +176,15 @@ class Screener:
 		def get_intraday(browser = None):
 			while True:
 				try:
-					df, browser = get_current(True,browser)
+					get_current(True,browser)
+					df = pd.read_feather("C:/Stocks/sync/files/current_scan.feather")
 					break
 				except (selenium.common.exceptions.NoSuchElementException, AttributeError):
 					try: browser.find_element(By.XPATH, '//button[@class="close-button-FuMQAaGA closeButton-zCsHEeYj defaultClose-zCsHEeYj"]').click()
 					except (selenium.common.exceptions.NoSuchElementException, AttributeError): pass
-			df = df.sort_values('Relative Volume at Time', ascending=False)
-			df = df[:60].reset_index(drop = True)
-			return df['Ticker'].tolist(), browser
+			df = df.sort_values('rvol', ascending = False)
+			df = df[:100].reset_index(drop = True)
+			return df['ticker'].tolist(), browser
 
 		if type == 'full': return get_full(refresh)
 		elif type == 'current': return get_current(refresh,browser)
@@ -238,5 +193,3 @@ class Screener:
 if __name__ == '__main__':
 	Screener.run('current')
 	study.run(study,True)
-	#Screener.run(ticker = 'ENPH',fpath = 1)
-	#study.run(study,True)
