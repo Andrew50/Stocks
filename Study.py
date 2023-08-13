@@ -23,12 +23,14 @@ class Study:
             self.filter(self)
             while True:
                 self.event, self.values = self.window.read()
+                
                 if self.event in ['Yes','No']:
                     if self.event == 'Yes': v = 1
                     else: v = 0
                     bar = self.setups_data.iloc[math.floor(self.i)]
                     ticker = bar['ticker']
                     dt = bar['dt']
+                    if data.is_pre_market(dt): dt = dt.replace(hour=9, minute=30)
                     st = bar['st']
                     data.add_setup(ticker,dt,st,v,1)
                     self.event = 'Next'
@@ -78,17 +80,12 @@ class Study:
                                 sort_by = req.split('^')[1]
                                 if sort_by not in df.columns: raise TimeoutError
                             else:
-                                values = req.split('|')
-                                dfs = []
-                                for r in values:
-                                    r = r.split('=')
-                                    trait = r[0]
-                                    if trait not in df.columns or len(r) == 1: raise TimeoutError
-                                    val = r[1]
-                                    if 'annotation' in trait: df = df[df[trait].str.contains(val)]
-                                    else: df = df[df[trait] == val]
-                                    dfs.append(df)
-                                df = pd.concat(dfs).drop_duplicates()
+                                r = req.split('=')
+                                trait = r[0]
+                                if trait not in df.columns or len(r) == 1: raise TimeoutError
+                                val = r[1]
+                                if 'annotation' in trait: df = df[df[trait].str.contains(val)]
+                                else: df = df[df[trait] == val]
                 if sort_by != None: df = df.sort_values(by = [sort_by], ascending = False)
                 else:df = df.sample(frac = 1)
             if df.empty: raise TimeoutError

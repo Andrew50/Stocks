@@ -269,21 +269,22 @@ class Traits:
 
 	def build_optimal_traits_table(self):
 		sell_table = []
+		traits = self.df_traits.dropna().reset_index(drop = True)
 		for thresh in [x/4 for x in range(1,81)]:
-			df = self.df_traits.copy()
+			df = traits
 			for i in range(len(df)):
 				if df.at[i,'max %'] >= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
 				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
 			sell_table.append([thresh,sum(df['pnl $'].tolist())])
 		stop_table = []
-		for thresh in [x/8 for x in range(-1,-81,-1)]:
-			df = self.df_traits.copy()
+		for thresh in [x/16 for x in range(0,-41,-1)]:
+			df = traits
 			for i in range(len(df)):  
 				if df.at[i,'min %'] <= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
 			stop_table.append([thresh,sum(df['pnl $'].tolist())])
 		size_table = []
 		for thresh in range(5,205,5):
-			df = self.df_traits.copy()
+			df = traits
 			for i in range(len(df)): df.at[i,'pnl $'] *= (thresh/df.at[i,'size %'])
 			size_table.append([thresh,sum(df['pnl $'].tolist())])
 		return sell_table, stop_table, size_table
@@ -297,7 +298,7 @@ class Traits:
 			else: wins.append(0)
 		win = statistics.mean(wins) * 100
 		high = df['max %'].mean()
-		high_time = df['high time'].mean()
+		max_time = df['high time'].mean()
 		miss = df['miss %'].mean()
 		risk = df[df['risk %'] > 0]['risk %'].mean()
 		size = df[df['size %'] > 0]['size %'].mean()
@@ -306,7 +307,7 @@ class Traits:
 		for trade in pnl_list: pnl *= trade
 		pnl -= 1
 		trades = len(df)
-		return [title,round(avg_gain,2), round(avg_loss,2), round(win,2),round(high,2), high_time, round(miss,2), round(risk,2), round(size,2), round(trades,2), round(pnl,2)]
+		return [title,round(avg_gain,2), round(avg_loss,2), round(win,2),round(high,2), max_time, round(miss,2), round(risk,2), round(size,2), round(trades,2), round(pnl,2)]
 
 	def build_rolling_traits_table(self):
 		groups = self.df_traits.groupby(pd.Grouper(key='datetime', freq='3M'))
@@ -412,12 +413,11 @@ class Traits:
 		high_dollars = 0
 		low_dollars = 0
 		pnl_dollars = 0
-		high_time = 0
+		max_time = 0
 		open_shares = 0
 		size_dollars = 0
 		total_size = 0
 		current_pnl = 0
-		prev_price = 0
 		high_price = float(first_trade[3])
 		low_price = float(first_trade[3])
 		for i in range(len(trades)):
@@ -437,16 +437,8 @@ class Traits:
 				symbol = 'v'
 			arrow_list.append([str(date),str(price),str(color),str(symbol)])
 			if not data_exists:
-				if price*direction > high_price*direction:
-					high_price = price
-					high_time = (data.format_date(date) - open_datetime).days
-				if price*direction < low_price*direction: 
-					low_price = price
-					low_time = (data.format_date(date) - open_datetime).days
-				current_pnl += open_shares*(price - prev_price)
 				if current_pnl < low_dollars: low_dollars = current_pnl
 				if current_pnl > high_dollars: high_dollars = current_pnl
-				prev_price = price
 			open_shares += shares
 		if open_shares != 0:
 			if data_exists: pnl_dollars += open_shares * df_1min.iat[-1,3]
@@ -474,6 +466,8 @@ class Traits:
 			current_low = 0
 			current_high = 0
 			size = 0
+			min_time = 0
+			max_time = 0
 			for i in range(len(df_1min)):
 				date = df_1min.index[i]
 				low = df_1min.iat[i,low_col]
@@ -481,10 +475,10 @@ class Traits:
 				if opened:
 					if high*direction > high_price*direction: 
 						high_price = high
-						high_time = (data.format_date(date) - open_datetime).days
+						max_time = (data.format_date(date) - open_datetime).days
 					if low*direction < low_price*direction: 
-						low_price = high
-						low_time = (data.format_date(date) - open_datetime).days
+						low_price = low
+						min_time = (data.format_date(date) - open_datetime).days
 				else:
 					if direction*low < direction*lod_price:
 						lod_price = low
@@ -507,26 +501,34 @@ class Traits:
 				prev_low = low
 				if pnl_dollars > high_dollars: high_dollars = pnl_dollars
 				if pnl_dollars < low_dollars: low_dollars = pnl_dollars
-				i
+			pnl_percent = ((pnl_dollars / size_dollars)) * 100
+			pnl_account = ((pnl_dollars / account_size)) * 100
 			min_account = (low_dollars / account_size - 1)*100
 			risk_percent = ( float(trades[0][3]) / lod_price - 1) * 100 * direction
+			max_percent = ((high_price / float(first_trade[3])) - 1) * 100 * direction
+			min_percent = ((low_price / float(first_trade[3])) - 1) * 100 * direction
+			max_account = (high_dollars / account_size) * 100
+			min_account = (low_dollars / account_size) * 100
+			miss_percent = max_percent - pnl_percent
 		else:
-			risk_percent = low_dollars / size_dollars * 100
-		pnl_percent = ((pnl_dollars / size_dollars)) * 100
-		pnl_account = ((pnl_dollars / account_size)) * 100
-		max_percent = ((high_price / float(first_trade[3])) - 1) * 100 * direction
-		min_percent = ((low_price / float(first_trade[3])) - 1) * 100 * direction
-		max_account = (high_dollars / account_size) * 100
-		min_account = (low_dollars / account_size) * 100
-		miss_percent = max_percent - pnl_percent
+			risk_percent = pd.NA
+			min_percent = pd.NA
+			min_account = pd.NA
+			min_time = pd.NA
+			max_time = pd.NA
+			max_account = pd.NA
+			max_percent = pd.NA
+			miss_percent = pd.NA
+			pnl_percent = ((pnl_dollars / size_dollars)) * 100
+			pnl_account = ((pnl_dollars / account_size)) * 100
 		def try_round(v):
 			try: return round(v,2)
 			except: return v
 		traits = pd.DataFrame({
 		'ticker': [ticker], 'datetime':[open_datetime], 'trades': [trades], 'setup':[setup], 'pnl $':[try_round(pnl_dollars)], 
 		'pnl %':[try_round(pnl_percent)], 'pnl a':[try_round(pnl_account)], 'size $':[try_round(size_dollars)], 'size %':[try_round(size_percent)],  
-		'max %':[try_round(max_percent)], 'high time':[high_time],'miss %':[try_round(miss_percent)],
-	   'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)],'min a':[try_round(min_account)], 'arrow_list':[arrow_list], 'closed':[try_round(closed)], 
+		'max %':[try_round(max_percent)], 'high time':[max_time],'max a':[try_round(max_account)],'miss %':[try_round(miss_percent)],
+	   'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)], 'min time':[try_round(min_time)],'min a':[try_round(min_account)], 'arrow_list':[arrow_list], 'closed':[try_round(closed)], 
 	   'open':[0], 'high':[try_round(high_dollars)], 'low':[try_round(low_dollars)], 'close':[try_round(pnl_dollars)],'volume':[try_round(total_size)]})
 		return traits
 
@@ -772,7 +774,7 @@ class Plot:
 
 	def sort(self):
 		try:
-			scan = self.df_traits
+			df = self.df_traits
 			sort_val = None
 			if not self.init:
 				sort = self.values['-input_sort-']
@@ -781,26 +783,20 @@ class Plot:
 					for req in reqs :
 						if '^' in req:
 							sort_val = req.split('^')[1]
-							if sort_val not in scan.columns and sort_val != 'r': raise TimeoutError
+							if sort_val not in df.columns and sort_val != 'r': raise TimeoutError
 						else:
-							req = req.split('|')
-							dfs = []
-							for r in req:
-								r = r.split('=')
-								trait = r[0]
-								if trait not in scan.columns or len(r) == 1: raise TimeoutError
-								val = r[1]
-								if trait == 'annotation': df = scan[scan[trait].str.contrains(val)]
-								else: df = scan[scan[trait] == val]
-								dfs.append(df)
-							print(dfs)
-							scan = pd.concat(dfs).drop_duplicates()
-				if scan.empty: raise TimeoutError
+							r = req.split('=')
+							trait = r[0]
+							if trait not in df.columns or len(r) == 1: raise TimeoutError
+							val = r[1]
+							if trait == 'annotation': df = df[df[trait].str.contrains(val)]
+							else: df = df[df[trait] == val]
+				if df.empty: raise TimeoutError
 			if sort_val != None:
-				if sort_val == 'r': scan = scan.sample(frac = 1)
-				else: scan = scan.sort_values(by = [sort_val], ascending = False)
-			else:scan = scan.sort_values(by = 'datetime', ascending = True)
-			self.sorted_traits = scan
+				if sort_val == 'r': df = df.sample(frac = 1)
+				else: df = df.sort_values(by = [sort_val], ascending = False)
+			else:df = df.sort_values(by = 'datetime', ascending = True)
+			self.sorted_traits = df
 			self.i = 0
 			if os.path.exists("C:/Stocks/local/account/charts"):
 				while True:

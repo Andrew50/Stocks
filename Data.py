@@ -55,7 +55,6 @@ class Data:
 		scores = model.predict(x)[:,1]
 		for i in range(len(scores)):
 			score = round(scores[i]*100)
-			print(score)
 			if score >= threshold:
 				bar = info[i]
 				ticker = bar[0]
@@ -132,6 +131,7 @@ class Data:
 		return df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification'] + ['ticker'] + ['dt'] + ['key']]
 
 	def train(st, percent_yes, epochs):
+		if len(pd.read_feather('C:/Stocks/local/data/' + st + '.feather')) < 100: return
 		x, y  = Data.sample(st, percent_yes)
 		model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
 		model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
@@ -142,9 +142,7 @@ class Data:
 
 		Data.consolidate_database()
 		allsetups = pd.read_feather('C:/Stocks/local/data/' + st + '.feather').sort_values(by='dt', ascending = False).reset_index(drop = True)
-		print(allsetups[allsetups['value'] == 1])
 		yes = []
-
 		no = []
 		groups = allsetups.groupby(pd.Grouper(key='ticker'))
 		dfs = [group for _,group in groups]
@@ -163,12 +161,12 @@ class Data:
 		while True:
 			no = no.drop_duplicates(subset = ['ticker','dt'])
 			required =  int(len(yes) - (len(no) * use))
-			if required < 0: break
-			sample = allsetups[allsetups['value'] == 0].sample(frac = 1)[:required + 1]
+			sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
+			if required < 0 or len(sample) == len(no): break
+			sample = sample[:required + 1]
 			no = pd.concat([no,sample])
 		df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
 		df['tf'] = st.split('_')[0]
-		print(df.to_string())
 		num_dfs = int(Data.get_config('Data cpu_cores'))
 		s = math.ceil(len(df) / num_dfs)
 		dfs = [df[int(s*i):int(s*(i+1))] for i in range(num_dfs)]
@@ -420,4 +418,5 @@ class Data:
 		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	Data.run()
+	setup_list = Data.get_setups_list()
+	for s in setup_list: Data.train(s,.05,200)
