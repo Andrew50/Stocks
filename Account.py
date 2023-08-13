@@ -272,7 +272,7 @@ class Traits:
 		for thresh in [x/4 for x in range(1,81)]:
 			df = self.df_traits.copy()
 			for i in range(len(df)):
-				if df.at[i,'high %'] >= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
+				if df.at[i,'max %'] >= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
 				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
 			sell_table.append([thresh,sum(df['pnl $'].tolist())])
 		stop_table = []
@@ -296,7 +296,7 @@ class Traits:
 			if df.iloc[i]['pnl $'] > 0: wins.append(1)
 			else: wins.append(0)
 		win = statistics.mean(wins) * 100
-		high = df['high %'].mean()
+		high = df['max %'].mean()
 		high_time = df['high time'].mean()
 		miss = df['miss %'].mean()
 		risk = df[df['risk %'] > 0]['risk %'].mean()
@@ -395,14 +395,15 @@ class Traits:
 		try: account_size = df_pnl.iloc[data.findex(df_pnl,open_datetime)]['account']
 		except IndexError: account_size = df_pnl.iloc[-1]['account']
 		if account_size == 0: account_size = 148.19
+		df_1min = data.get(ticker,'1min',close_datetime)
+		time = datetime.time(9,30,0)
+		rounded_open_datetime = datetime.datetime.combine(open_datetime.date(),time)
 		try: 
-			df_1min = data.get(ticker,'1min',close_datetime)
-			time = datetime.time(9,30,0)
-			rounded_open_datetime = datetime.datetime.combine(open_datetime.date(),time)
 			index = data.findex(df_1min,rounded_open_datetime)
 			df_1min = df_1min[index:]
 			data_exists = True
-		except (FileNotFoundError , IndexError): data_exists = False
+		except IndexError: 
+			data_exists = False
 		if float(first_trade[2]) > 0: direction = 1
 		else:  direction = -1
 		arrow_list = []
@@ -418,6 +419,7 @@ class Traits:
 		current_pnl = 0
 		prev_price = 0
 		high_price = float(first_trade[3])
+		low_price = float(first_trade[3])
 		for i in range(len(trades)):
 			date = trades[i][1]
 			shares = float(trades[i][2])
@@ -435,12 +437,15 @@ class Traits:
 				symbol = 'v'
 			arrow_list.append([str(date),str(price),str(color),str(symbol)])
 			if not data_exists:
-				if price*direction > high_price*direction: high_price = price
+				if price*direction > high_price*direction:
+					high_price = price
+					high_time = (data.format_date(date) - open_datetime).days
+				if price*direction < low_price*direction: 
+					low_price = price
+					low_time = (data.format_date(date) - open_datetime).days
 				current_pnl += open_shares*(price - prev_price)
 				if current_pnl < low_dollars: low_dollars = current_pnl
-				if current_pnl > high_dollars: 
-					high_dollars = current_pnl
-					high_time = (data.format_date(date) - open_datetime).days
+				if current_pnl > high_dollars: high_dollars = current_pnl
 				prev_price = price
 			open_shares += shares
 		if open_shares != 0:
@@ -473,10 +478,14 @@ class Traits:
 				date = df_1min.index[i]
 				low = df_1min.iat[i,low_col]
 				high = df_1min.iat[i,high_col]
-				if size != 0:
-					current_low_percent = (current_low / abs(size)) *100
-					if current_low_percent < min_percent: min_percent = current_low_percent
-				if not opened:
+				if opened:
+					if high*direction > high_price*direction: 
+						high_price = high
+						high_time = (data.format_date(date) - open_datetime).days
+					if low*direction < low_price*direction: 
+						low_price = high
+						low_time = (data.format_date(date) - open_datetime).days
+				else:
 					if direction*low < direction*lod_price:
 						lod_price = low
 				while date > next_trade_date:
@@ -496,31 +505,29 @@ class Traits:
 				if current_high > high_dollars: high_dollars = current_high
 				prev_high = high
 				prev_low = low
+				if pnl_dollars > high_dollars: high_dollars = pnl_dollars
+				if pnl_dollars < low_dollars: low_dollars = pnl_dollars
+				i
 			min_account = (low_dollars / account_size - 1)*100
 			risk_percent = ( float(trades[0][3]) / lod_price - 1) * 100 * direction
-			if pnl_dollars > high_dollars: high_dollars = pnl_dollars
-			if pnl_dollars < low_dollars: low_dollars = pnl_dollars
-			if high*direction > high_price*direction: 
-				high_price = high
-				high_time = (data.format_date(date) - open_datetime).days
-
 		else:
 			risk_percent = low_dollars / size_dollars * 100
-			min_percent = low_dollars/size_dollars * 100
-			min_account = min_percent * size_percent / 100
 		pnl_percent = ((pnl_dollars / size_dollars)) * 100
 		pnl_account = ((pnl_dollars / account_size)) * 100
-		high_percent = ((high_price / float(first_trade[3])) - 1) * 100 * direction
-		
-		miss_percent = high_percent - pnl_percent
+		max_percent = ((high_price / float(first_trade[3])) - 1) * 100 * direction
+		min_percent = ((low_price / float(first_trade[3])) - 1) * 100 * direction
+		max_account = (high_dollars / account_size) * 100
+		min_account = (low_dollars / account_size) * 100
+		miss_percent = max_percent - pnl_percent
 		def try_round(v):
 			try: return round(v,2)
 			except: return v
 		traits = pd.DataFrame({
 		'ticker': [ticker], 'datetime':[open_datetime], 'trades': [trades], 'setup':[setup], 'pnl $':[try_round(pnl_dollars)], 
 		'pnl %':[try_round(pnl_percent)], 'pnl a':[try_round(pnl_account)], 'size $':[try_round(size_dollars)], 'size %':[try_round(size_percent)],  
-		'high %':[try_round(high_percent)], 'high time':[high_time],'miss %':[try_round(miss_percent)],
-	   'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)],'min a':[try_round(min_account)], 'arrow_list':[arrow_list], 'closed':[try_round(closed)], 'open':[0], 'high':[try_round(high_dollars)], 'low':[try_round(low_dollars)], 'close':[try_round(pnl_dollars)],'volume':[try_round(total_size)]})
+		'max %':[try_round(max_percent)], 'high time':[high_time],'miss %':[try_round(miss_percent)],
+	   'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)],'min a':[try_round(min_account)], 'arrow_list':[arrow_list], 'closed':[try_round(closed)], 
+	   'open':[0], 'high':[try_round(high_dollars)], 'low':[try_round(low_dollars)], 'close':[try_round(pnl_dollars)],'volume':[try_round(total_size)]})
 		return traits
 
 class Account:
@@ -726,12 +733,12 @@ class Plot:
 
 	def update(self):
 		trade_headings = ['Date             ','Shares   ','Price  ']
-		trait_headings = ['setup','pnl $','pnl %','pnl a', 'high %','risk %']
+		trait_headings = ['setup','pnl $','pnl %','pnl a', 'max %','min %','miss %','risk %','size %']
 		if self.init:
 			Plot.sort(self)
 			self.init = False
-			c2 = [[sg.Image(key = '-IMAGE2-')], [sg.Image(key = '-IMAGE0-')]]
-			c1 = [[sg.Image(key = '-IMAGE1-')], [(sg.Text(key = '-number-'))], 
+			c2 = [[sg.Image(key = '-IMAGE1-')], [sg.Image(key = '-IMAGE0-')]]
+			c1 = [[sg.Image(key = '-IMAGE2-')], [(sg.Text(key = '-number-'))], 
 				[sg.Table([],headings = trait_headings,num_rows = 1, key = '-trait_table-',auto_size_columns=True,justification='left', expand_y = False)],
 				[sg.Table([],headings = trade_headings, key = '-trade_table-',auto_size_columns=True,justification='left',num_rows = 8, expand_y = False)],
 				[sg.Button('Prev'),sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_sort-')],
