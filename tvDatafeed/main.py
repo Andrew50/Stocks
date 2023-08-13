@@ -76,7 +76,7 @@ class TvDatafeed:
                     url=self.__sign_in_url, data=data, headers=self.__signin_headers)
                 token = response.json()['user']['auth_token']
             except Exception as e:
-                logger.error('error while signin')
+                #logger.error('error while signin')
                 token = None
 
         return token
@@ -213,7 +213,7 @@ class TvDatafeed:
 
         #interval = interval.value
         if interval == '1min': interval = '1'
-        if interval == 'd': interal = '1D'
+        if interval == 'd': interval = '1D'
         self.__create_connection()
 
         self.__send_message("set_auth_token", [self.token])

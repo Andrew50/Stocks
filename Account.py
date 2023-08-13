@@ -269,29 +269,23 @@ class Traits:
 
 	def build_optimal_traits_table(self):
 		sell_table = []
-		for thresh in [x/2 for x in range(1,41)]:
+		for thresh in [x/4 for x in range(1,81)]:
 			df = self.df_traits.copy()
 			for i in range(len(df)):
-				if df.at[i,'high %'] >= thresh: df.at[i,'pnl a'] *= (thresh / df.at[i,'pnl %'])
-				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl a'] = 0
-			pnl = 1
-			for v in df['pnl a'].tolist(): pnl *= (v/100 + 1)
-			sell_table.append([thresh,(pnl - 1)*100])
+				if df.at[i,'high %'] >= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
+				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
+			sell_table.append([thresh,sum(df['pnl $'].tolist())])
 		stop_table = []
-		for thresh in [x/4 for x in range(-1,-41,-1)]:
+		for thresh in [x/8 for x in range(-1,-81,-1)]:
 			df = self.df_traits.copy()
 			for i in range(len(df)):  
-				if df.at[i,'min %'] <= thresh: df.at[i,'pnl a'] = df.at[i,'size %'] * thresh / 100
-			pnl = 1
-			for v in df['pnl a'].tolist(): pnl *= (v/100 + 1)
-			stop_table.append([thresh,(pnl - 1)*100])
+				if df.at[i,'min %'] <= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
+			stop_table.append([thresh,sum(df['pnl $'].tolist())])
 		size_table = []
 		for thresh in range(5,205,5):
 			df = self.df_traits.copy()
-			for i in range(len(df)): df.at[i,'pnl a'] *= (thresh/df.at[i,'size %'])
-			pnl = 1
-			for v in df['pnl a'].tolist(): pnl *= (v/100 + 1)
-			size_table.append([thresh,(pnl - 1)*100])
+			for i in range(len(df)): df.at[i,'pnl $'] *= (thresh/df.at[i,'size %'])
+			size_table.append([thresh,sum(df['pnl $'].tolist())])
 		return sell_table, stop_table, size_table
 
 	def calc_trait_values(df,title):
@@ -447,10 +441,11 @@ class Traits:
 				if current_pnl > high_dollars: 
 					high_dollars = current_pnl
 					high_time = (data.format_date(date) - open_datetime).days
-				open_shares += shares
 				prev_price = price
+			open_shares += shares
 		if open_shares != 0:
-			pnl_dollars += open_shares * df_1min.iat[-1,3]
+			if data_exists: pnl_dollars += open_shares * df_1min.iat[-1,3]
+			else: pnl_dollars += open_shares * price
 			closed = False
 		else: closed = True
 		size_percent = (size_dollars / account_size) * 100
@@ -737,8 +732,8 @@ class Plot:
 			self.init = False
 			c2 = [[sg.Image(key = '-IMAGE2-')], [sg.Image(key = '-IMAGE0-')]]
 			c1 = [[sg.Image(key = '-IMAGE1-')], [(sg.Text(key = '-number-'))], 
-				[sg.Table([],headings = trait_headings,num_rows = 2, key = '-trait_table-',auto_size_columns=True,justification='left', expand_y = False)],
-				[sg.Table([],headings = trade_headings, key = '-trade_table-',auto_size_columns=True,justification='left',num_rows = 5, expand_y = False)],
+				[sg.Table([],headings = trait_headings,num_rows = 1, key = '-trait_table-',auto_size_columns=True,justification='left', expand_y = False)],
+				[sg.Table([],headings = trade_headings, key = '-trade_table-',auto_size_columns=True,justification='left',num_rows = 8, expand_y = False)],
 				[sg.Button('Prev'),sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_sort-')],
 				[sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
 			layout = [[sg.Column(c1), sg.VSeperator(), sg.Column(c2)],]
@@ -791,6 +786,7 @@ class Plot:
 								if trait == 'annotation': df = scan[scan[trait].str.contrains(val)]
 								else: df = scan[scan[trait] == val]
 								dfs.append(df)
+							print(dfs)
 							scan = pd.concat(dfs).drop_duplicates()
 				if scan.empty: raise TimeoutError
 			if sort_val != None:

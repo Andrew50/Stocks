@@ -56,10 +56,10 @@ class Study:
     def preload(self):
         if self.i == 0:
             if self.current: index_list = [float(i) for i in range(10)]
-            else: index_list = [float(i/2) for i in range(20)]
-        else: index_list = [9 + self.i]
+            else: index_list = [float(i/2) for i in range(40)]
+        else: index_list = [19 + self.i]
         arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
-        self.pool.map(self.plot,arglist)
+        self.pool.map_async(self.plot,arglist)
         
     def filter(self):
         try:
@@ -163,7 +163,7 @@ class Study:
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
                 plt.savefig(p, bbox_inches='tight',dpi = data.get_config('Study chart_dpi'))
-            except TimeoutError: shutil.copy(r"C:\Stocks\sync\files\blank.png",p)
+            except: shutil.copy(r"C:\Stocks\sync\files\blank.png",p)
             ii -= 1
 
     def update(self):

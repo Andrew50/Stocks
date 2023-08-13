@@ -3,10 +3,48 @@ import datetime
 from Screener import Screener as screener
 import pandas as pd
 import os
+import time
+from tvDatafeed import TvDatafeed
+
+#print((13-(time.timezone/3600)))
+
+#df = data.get(ticker ='MRAM',dt = datetime.datetime(2023,8,11,9,30))
+
+#print(df)
+
+
+
+p = 'C:/Stocks/sync/database/laptop_d_EP.feather'
+df = pd.read_feather(p)
+df.rename(columns={'date':'dt','req':'required','setup':'value'}, inplace = True)
+df.to_feather(p)
+print(df)
+
+
+
+#ticker = 'AEHR'
+#base_tf = '1min'
+#dt = None
+#exchange = pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange']
+#add = TvDatafeed(username="billingsandrewjohn@gmail.com",password="Steprapt04").get_hist(ticker, exchange, interval=base_tf, n_bars=100000, extended_session = True)
+#print(add)
+
+
+
+
+
+
+
+
+
+
+
+
+
 #print((data.get(tf = 'd',dt = datetime.datetime(2023,8,10,9,15),bars = 100)).to_string())
 #df_traits = pd.read_feather('C:/Stocks/local/account/traits.feather')
-
-print(data.get(tf = '2min', dt = datetime.datetime(2022,8,10,9,45)))
+#print(pd.read_feather('C:/Stocks/local/study/current_setups.feather'))
+#print(data.get(tf = '2min', dt = datetime.datetime(2022,8,10,9,45)))
 
 #df = pd.read_feather('C:/Stocks/sync/files/full_scan.feather')
 #print(df.columns)

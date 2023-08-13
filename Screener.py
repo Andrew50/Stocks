@@ -1,11 +1,11 @@
 import pathlib, time, selenium, datetime, os, math
 import pandas as pd
 import numpy as np
-from Data import Data as data
-from Study import Study as study
 import mplfinance as mpf
-from discordwebhook import Discord
+from Data import Data as data
 from multiprocessing import Pool
+from Study import Study as study
+from discordwebhook import Discord
 import selenium.webdriver as webdriver
 from selenium.webdriver.common.by import By 
 from selenium.webdriver.firefox.options import Options 
@@ -22,7 +22,8 @@ class Screener:
 					ticker_list = Screener.get('full')
 				else:
 					if 'd' in tf or 'w' in tf: 
-						ticker_list, browser = Screener.get('current',True,browser)
+						ticker_list, browser = Screener.get('current',False,browser)############################
+						ticker_list = ticker_list[:2000]
 						path = 1
 					else: 
 						ticker_list, browser = Screener.get('intraday',True,browser)
@@ -45,7 +46,7 @@ class Screener:
 			for i in range(num_dfs):
 				d = df[int(s*i):int(s*(i+1))].reset_index(drop = True)
 				if not d.empty: values.append(pool.apply_async(data.create_arrays,args = ([d]))) 
-			model_list = [data.load_model(st) for st in data.get_config('Screener active_setup_list').split(',') if tf in st]
+			model_list = [[st,data.load_model(st)] for st in data.get_config('Screener active_setup_list').split(',') if tf in st]
 			x = np.concatenate([bar.get()[0] for bar in values])
 			info = np.concatenate([bar.get()[2] for bar in values])
 			dfs = []
@@ -170,7 +171,8 @@ class Screener:
 			df = df.drop('Description', axis = 1)
 			df = df.fillna(0)
 			df = df.rename(columns={'Ticker':'ticker','Exchange':'exchange','Pre-market Change':'pm change','Pre-market Volume':'pm volume','Relative Volume at Time':'rvol'})
-			df.reset_index(drop = True).to_feather(r"C:\Stocks\sync\files\current_scan.feather")
+			df = df.reset_index(drop = True)
+			df.to_feather(r"C:\Stocks\sync\files\current_scan.feather")
 			return df['ticker'].tolist() , browser
 
 		def get_intraday(browser = None):
@@ -191,5 +193,6 @@ class Screener:
 		elif type == 'intraday': return get_intraday(browser)
 
 if __name__ == '__main__':
-	Screener.run('current')
+	Screener.run(datetime.datetime(2023,8,11,9,15))
+	#Screener.run('current')
 	study.run(study,True)
