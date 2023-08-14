@@ -89,7 +89,7 @@ class Log:
 
 	def queue_recalcs(self,updated_log):
 		if not self.df_log.empty: 
-			new_log = pd.concat([self.df_log, updated_log]).drop_duplicates(keep=False).sort_values(by='datetime', ascending = False)
+			new_log = pd.concat([self.df_log, updated_log]).drop_duplicates(subset = ['ticker','datetime','shares','price'], keep = False).sort_values(by='datetime', ascending = False)
 			self.df_log = updated_log.sort_values(by='datetime', ascending = False).reset_index(drop = True)
 			self.queued_recalcs = pd.concat([self.queued_recalcs,new_log]).reset_index(drop = True)
 		else:
@@ -273,7 +273,7 @@ class Traits:
 			bio = io.BytesIO()
 			image.save(bio, format="PNG")
 			self.window['-CHART-'].update(data = bio.getvalue())
-			#######
+			
 	def build_optimal_traits_table(self):
 		current_pnl = sum(self.df_traits['pnl $'])
 		print(self.df_traits[['min a','pnl $']].sort_values('min a',ascending = False))
@@ -285,7 +285,6 @@ class Traits:
 				if df.at[i,'max %'] >= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
 				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
 			sell_percent_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
-
 		sell_account_table = []
 		for thresh in [x/8 for x in range(1,161)]:
 			df = traits.copy()
@@ -293,22 +292,18 @@ class Traits:
 				if df.at[i,'max a'] >= thresh: df.at[i,'pnl $'] = df.at[i,'account_size'] * thresh / 100
 				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
 			sell_account_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
-
 		stop_percent_table = []
 		for thresh in [x/16 for x in range(0,-81,-1)]:
 			df = traits.copy()
 			for i in range(len(df)):  
 				if df.at[i,'min %'] <= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
 			stop_percent_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
-
 		stop_account_table = []
 		for thresh in [x/16 for x in range(0,-81,-1)]:
 			df = traits.copy()
 			for i in range(len(df)):  
 				if df.at[i,'min a'] <= thresh: df.at[i,'pnl $'] = df.at[i,'account_size'] * thresh / 100
 			stop_account_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
-
-
 		return sell_percent_table, sell_account_table, stop_percent_table, stop_account_table
 
 	def calc_trait_values(df,title):
@@ -339,12 +334,12 @@ class Traits:
 		return rolling_traits
 
 	def build_setup_traits_table(self):
-		groups = self.df_traits.groupby(pd.Grouper(key='setup',))
+		groups = self.df_traits.groupby(pd.Grouper(key='setup'))
 		dfs = [group for _,group in groups]
 		return [Traits.calc_trait_values(df,df.iloc[0]['setup']) for df in dfs]
 		
 	def build_trades_table(self, winners):
-		sorted_df = self.df_traits.sort_values(by = ['pnl a'], ascending = winners).reset_index(drop = True)
+		sorted_df = self.df_traits.sort_values('pnl a', ascending = winners).reset_index(drop = True)
 		df = pd.DataFrame()
 		df['#'] = sorted_df.index + 1
 		df['Ticker'] = sorted_df['ticker']
@@ -362,7 +357,7 @@ class Traits:
 		trades = Traits.calc_trades(pd.concat(dfs))
 		arglist = [[trades.iloc[i], self.df_pnl] for i in range(len(trades))]
 		new_traits = pd.concat(data.pool(Traits.calc_traits,arglist))
-		self.df_traits = pd.concat([self.df_traits,new_traits]).sort_values(by='datetime',ascending = True).reset_index(drop = True)
+		self.df_traits = pd.concat([self.df_traits,new_traits]).sort_values(by = 'datetime',ascending = True).reset_index(drop = True)
 		self.df_traits.to_feather(r'C:\Stocks\local\account\traits.feather')
 
 	def calc_trades(df_log):
@@ -414,7 +409,6 @@ class Traits:
 		last_trade = trades[-1]
 		open_datetime = data.format_date(first_trade[1])
 		close_datetime = data.format_date(last_trade[1])
-		setup = first_trade[4]
 		try: account_size = df_pnl.iloc[data.findex(df_pnl,open_datetime)]['account']
 		except IndexError: account_size = df_pnl.iloc[-1]['account']
 		if account_size == 0: account_size = 148.19
@@ -440,7 +434,7 @@ class Traits:
 		size_dollars = 0
 		total_size = 0
 		current_pnl = 0
-		
+		setup = ''
 		for i in range(len(trades)):
 			date = trades[i][1]
 			shares = float(trades[i][2])
@@ -449,6 +443,7 @@ class Traits:
 			total_size += abs(dollars)
 			current_size += dollars
 			pnl_dollars -= dollars
+			if setup == '' and trades[i][4] != '': setup = trades[i][4]
 			if abs(current_size) > abs(size_dollars): size_dollars = abs(current_size)
 			if shares > 0:
 				color = 'g'
@@ -503,7 +498,6 @@ class Traits:
 					if low*direction < low_price*direction: 
 						low_price = low
 						min_time = (data.format_date(date) - open_datetime).days
-				
 				else:
 					if direction*low < direction*lod_price:
 						lod_price = low
@@ -536,7 +530,6 @@ class Traits:
 			min_account = (low_dollars / account_size) * 100
 			miss_percent = max_percent - pnl_percent
 			if pnl_percent < min_percent: min_percent = pnl_percent
-
 		else:
 			risk_percent = pd.NA
 			min_percent = pd.NA
@@ -568,14 +561,14 @@ class Account:
 			self.queued_recalcs = pd.DataFrame()
 			try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
 			except FileNotFoundError: pass
-		else:  self.pnl_chart_type = self.event
+		else: self.pnl_chart_type = self.event
 		Account.update(self)
 
 	def update(self):
 		if self.init:
 			self.init = False
 			self.pnl_chart_type = 'Trade'
-			layout =[[sg.Image(key = '-CHART-')],
+			layout = [[sg.Image(key = '-CHART-')],
 			[sg.Button('Trade'),sg.Button('Periodic Trade'),sg.Button('Real'),sg.Button('Periodic Real'),sg.Button('Recalc')],
 			[sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
 			self.window = sg.Window('Account', layout,margins = (10,10),scaling=data.get_config('Account ui_scale'),finalize = True)
@@ -593,8 +586,7 @@ class Account:
 					pc = c
 		elif 'Real' in self.pnl_chart_type:
 			df = self.df_pnl
-			logic = {'open':'first','high':'max','low':'min','close':'last','volume':'sum' }
-			df = df.resample('d').apply(logic).dropna()
+			df = df.resample('d').apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum' }).dropna()
 			if 'Periodic' in self.pnl_chart_type:
 				pc = 0
 				for i in range(len(df)):
@@ -644,7 +636,6 @@ class Account:
 					pos.append([ticker,shares,df])
 			pnl = bar['open']
 			deposits = bar['deposits']
-		
 		pbar = tqdm(total=len(date_list))
 		for i in range(len(date_list)):
 			date = date_list[i]
@@ -822,7 +813,7 @@ class Plot:
 				if df.empty: raise TimeoutError
 			if sort_val != None:
 				if sort_val == 'r': df = df.sample(frac = 1)
-				else: df = df.sort_values(by = [sort_val], ascending = False)
+				else: df = df.sort_values(sort_val, ascending = False)
 			else:df = df.sort_values(by = 'datetime', ascending = True)
 			self.sorted_traits = df
 			self.i = 0
@@ -850,7 +841,6 @@ class Plot:
 		ticker = trait_bar['ticker']
 		dt = trait_bar['datetime']
 		for ii in range(len(tflist)):
-
 			if not from_traits: 
 				p = pathlib.Path("C:/Stocks/local/account/charts") / (str(ii) + '_' + str(i)  + ".png")
 				if os.path.exists(p): return
