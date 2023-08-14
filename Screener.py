@@ -22,8 +22,7 @@ class Screener:
 					ticker_list = Screener.get('full')
 				else:
 					if 'd' in tf or 'w' in tf: 
-						ticker_list, browser = Screener.get('current',False,browser)############################
-						ticker_list = ticker_list[:2000]
+						ticker_list, browser = Screener.get('current',True,browser)
 						path = 1
 					else: 
 						ticker_list, browser = Screener.get('intraday',True,browser)
