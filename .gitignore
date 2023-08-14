@@ -34,6 +34,12 @@ bld/
 [Ll]ogs/
 local
 config.txt
+Account.lnk
+Account.bat
+Study.lnk
+Study.bat
+Trainer.lnk
+Trainer.bat
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

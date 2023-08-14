@@ -3,8 +3,18 @@
 	cpu_cores = 8
 	data_drive_letter = C
 -Screener
-	active_setup_list = d_EP,d_NEP,d_P,d_F,d_MR,d_NP,d_NF
+	active_setup_list = d_EP,d_NEP,d_P,d_NP,d_F,d_NF,d_MR
 	threshold = 25
+	w_F = 20,3.5,2
+	d_EP = 2,2.5,1
+	d_NEP = 4,2.5,1
+	d_P = 5,2.5,.8
+	d_NP = 5,2.5,.8
+	d_F = 8,2.5,.5
+	d_NF = 10,2.5,.5
+	d_MR = 10,3,1
+	h_F = 1.5,1.5,2
+	1min_VF = .03,0,inf
 -Study 
 	ui_scale = 2.5
 	chart_size = .49
@@ -21,7 +31,7 @@
 -Log
 	ui_scale = 5
 -Traits:
-	ui_scale = 3.5
+	ui_scale = 3
 	chart_size = .84
 	chart_aspect_ratio = 2.15
 	chart_dpi = 330
