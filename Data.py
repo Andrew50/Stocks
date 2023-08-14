@@ -321,9 +321,10 @@ class Data:
 
 	def refill_backtest():
 		from Screener import Screener as screener
-		historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+		try: historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+		except: historical_setups = pd.DataFrame()
 		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"): shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-		while(len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
+		while historical_setups.empty or (len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
 			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather").sample(frac=1)
 			screener.run(ticker = full_list_minus_annotation[:20]['ticker'].tolist(), fpath = 0)
 			full_list_minus_annotation = full_list_minus_annotation[20:].reset_index(drop=True)
