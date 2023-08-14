@@ -207,4 +207,4 @@ class Study:
         self.window.maximize()
 
 if __name__ == "__main__":
-    Study.run(Study,True)
+    Study.run(Study,False)
