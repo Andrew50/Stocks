@@ -1,23 +1,21 @@
-
-from ast import Attribute
-import datetime,PIL, io, pathlib, shutil, os, statistics
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+from imbox import Imbox
 import mplfinance as mpf
 import PySimpleGUI as sg
-import matplotlib.ticker as mticker
-from imbox import Imbox
-from multiprocessing.pool import Pool
-from matplotlib import pyplot as plt
-from tqdm import tqdm
 from Data import Data as data
+import matplotlib.ticker as mticker
+from matplotlib import pyplot as plt
+from multiprocessing.pool import Pool
+import datetime,PIL, io, pathlib, shutil, os, statistics
 
 class Run:
 
 	def run(self):
 		with Pool(int(data.get_config('Data cpu_cores'))) as self.pool:
 			sg.theme('DarkGrey')
-			try: self.df_log = pd.read_feather(r"C:\Stocks\local\account\log.feather").sort_values(by='datetime',ascending = False)
+			try: self.df_log = pd.read_feather(r"C:\Stocks\local\account\log.feather")
 			except FileNotFoundError: self.df_log = pd.DataFrame()
 			try: self.df_traits = pd.read_feather(r"C:\Stocks\local\account\traits.feather")
 			except FileNotFoundError: self.df_traits = pd.DataFrame()
@@ -52,6 +50,7 @@ class Run:
 		self.init = True
 		try: self.window.close()
 		except AttributeError: pass
+
 class Log:
 
 	def log(self):
@@ -90,7 +89,6 @@ class Log:
 
 	def queue_recalcs(self,updated_log):
 		if not self.df_log.empty: 
-			#deposits = self.df_log[self.df_log['ticker'] == 'Deposit']
 			new_log = pd.concat([self.df_log, updated_log]).drop_duplicates(keep=False).sort_values(by='datetime', ascending = False)
 			self.df_log = updated_log.sort_values(by='datetime', ascending = False).reset_index(drop = True)
 			self.queued_recalcs = pd.concat([self.queued_recalcs,new_log]).reset_index(drop = True)
@@ -117,7 +115,7 @@ class Log:
 		setup = self.values['-input_setup-']
 		try:
 			dt = datetime.datetime.strptime(self.values['-input_datetime-'], '%Y-%m-%d %H:%M:%S')
-			if ticker == ''  or shares == '' or price == '': raise TimeoutError
+			if ticker == '' or shares == '' or price == '': raise TimeoutError
 		except (TimeoutError, TypeError):
 			sg.Popup('check inputs')
 			return
@@ -133,7 +131,6 @@ class Log:
 			updated_log.iat[self.log_index,4] = setup
 		self.log_index = None
 		self.window['-log_table-'].update(select_rows=[])
-		print(updated_log)
 		Log.queue_recalcs(self,updated_log)
 	
 	def pull(self):
@@ -167,7 +164,8 @@ class Log:
 			log2 = log2[(log2['datetime'] > '2021-12-01')]
 			log2 = log2.sort_values(by='datetime', ascending = False).reset_index(drop = True)
 			updated_log = log2
-		elif ident == 'ben': #
+		elif ident == 'ben':
+			raise Exception('need to fix pull method ben')
 			df = pd.read_csv("C:/Screener/11-26-21 orders.csv")
 			df = df.drop([0, 1, 2])
 			dfnew = []
@@ -206,7 +204,6 @@ class Log:
 			raise Exception('no pull method created')
 		Log.queue_recalcs(self,updated_log)
 
-
 class Traits:
 
 	def traits(self):
@@ -215,8 +212,8 @@ class Traits:
 			self.queued_recalcs = pd.DataFrame()
 			try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
 			except FileNotFoundError: pass
-		elif (self.event == '-table_losers-' or self.event =='-table_winners-') and len(self.values[self.event]) > 0:
-			sorted_df = self.df_traits.sort_values(by = ['pnl a'], ascending = (self.event == '-table_winners-')).reset_index(drop = True)
+		elif (self.event == '-table_losers-' or self.event == '-table_winners-') and len(self.values[self.event]) > 0:
+			sorted_df = self.df_traits.sort_values('pnl a', ascending = (self.event == '-table_winners-')).reset_index(drop = True)
 			Plot.create([self.values[self.event][0],sorted_df,True])
 		elif '+CLICKED+' in self.event and self.event[2][1] != 0:
 			table = self.window[self.event[0]].Values
@@ -232,62 +229,87 @@ class Traits:
 				plt.xticks(x_filler, x)
 			plt.gcf().set_size_inches((data.get_config('Traits chart_size') * data.get_config('Traits chart_aspect_ratio') * 22.5,data.get_config('Traits chart_size') * 25.7))
 			plt.savefig(pathlib.Path("C:/Stocks/local/account") / "trait.png",bbox_inches='tight')
+		elif self.event == 'Load':
+			try: x = self.df_traits[self.values['-input_trait-']]
+			except Exception as e: sg.Popup(e)
+			else:
+				plt.clf()
+				plt.hist(x, ec='black', bins=25)
+				plt.gcf().set_size_inches((data.get_config('Traits chart_size') * data.get_config('Traits chart_aspect_ratio') * 22.5,data.get_config('Traits chart_size') * 25.7))
+				plt.savefig(pathlib.Path("C:/Stocks/local/account") / "trait.png",bbox_inches='tight')
 		Traits.update(self)
 
 	def update(self):
 		if self.init:
 			self.init = False
-			rolling_traits_header = ['Date  ','Gain','Loss','Win ','High','H time','Miss','Risk','Size','# ','% a ']
-			biggest_trades_header = ['# ','Tick','Date    ','% a ']
-			setup_traits_header = ['Setup'] + rolling_traits_header[1:]
-			c1 = [[sg.Table([],headings=biggest_trades_header,key = '-table_winners-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
-			c2 = [[sg.Table([],headings=biggest_trades_header,key = '-table_losers-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
-			c3 = [[sg.Table([],headings=setup_traits_header,key = '-table_setups-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
-			c4 = [[sg.Table([],headings=rolling_traits_header,key = '-table_rolling_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
-			c5 = [[sg.Table([],headings=['Sell','PnL a'],key = '-table_sell_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
-			c6 = [[sg.Table([],headings=['Stop','PnL a'],key = '-table_stop_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
-			c7 = [[sg.Table([],headings=['Size','PnL a'],key = '-table_size_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
-			c8 = [[sg.Button('Recalc')], [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
-			c9 = [[sg.Image(key = '-CHART-')]]
-			layout = [[sg.Column(c1), sg.VSeperator(), sg.Column(c2), sg.VSeperator(), sg.Column(c3), sg.VSeperator(),
-			sg.Column(c4), sg.VSeperator(),sg.Column(c5), sg.VSeperator(),sg.Column(c6), sg.VSeperator(),sg.Column(c7), sg.VSeperator(),],[sg.Column(c8),sg.VSeperator(),sg.Column(c9),]]
+			rolling_traits_header = ['date  ','gain','loss','win ','max','m time','miss','risk','size','# ','% a ']
+			biggest_trades_header = ['# ','tick','date    ','% a ']
+			setup_traits_header = ['setup'] + rolling_traits_header[1:]
+			c1 = [[sg.Table([],headings=biggest_trades_header,key = '-table_winners-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
+			c2 = [[sg.Table([],headings=biggest_trades_header,key = '-table_losers-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
+			c3 = [[sg.Table([],headings=setup_traits_header,key = '-table_setups-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c4 = [[sg.Table([],headings=rolling_traits_header,key = '-table_rolling_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c5 = [[sg.Table([],headings=['Sell %','r $'],key = '-table_sell_percent_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c6 = [[sg.Table([],headings=['Sell a','r $'],key = '-table_sell_account_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c7 = [[sg.Table([],headings=['Stop %','r $'],key = '-table_stop_percent_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c8 = [[sg.Table([],headings=['Stop a','r $'],key = '-table_stop_account_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c9 = [[sg.Input(key = '-input_trait-')],[sg.Button('Load')]]
+			c10 = [[sg.Button('Recalc')], [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
+			c11 = [[sg.Image(key = '-CHART-')]]
+			layout = [[sg.Column(c1), sg.VSeperator(), sg.Column(c2), sg.VSeperator(), sg.Column(c3), sg.VSeperator(), sg.Column(c4), sg.VSeperator(),sg.Column(c5), sg.VSeperator(),sg.Column(c6),  sg.VSeperator(), sg.Column(c7),  sg.VSeperator(), sg.Column(c8),  sg.VSeperator(), sg.Column(c9)],[sg.Column(c10),sg.VSeperator(),sg.Column(c11),]]
 			self.window = sg.Window('Traits', layout,margins = (10,10),scaling=data.get_config('Traits ui'),finalize = True)
 			self.window.maximize()
-		sell_table, stop_table, size_table = Traits.build_optimal_traits_table(self)
+		sell_percent_table, sell_account_table, stop_percent_table, stop_account_table = Traits.build_optimal_traits_table(self)
 		self.window['-table_winners-'].update(Traits.build_trades_table(self,True))
 		self.window['-table_losers-'].update(Traits.build_trades_table(self,False))
 		self.window['-table_setups-'].update(Traits.build_setup_traits_table(self))
 		self.window['-table_rolling_traits-'].update(Traits.build_rolling_traits_table(self))
-		self.window['-table_sell_traits-'].update(sell_table)
-		self.window['-table_stop_traits-'].update(stop_table)
-		self.window['-table_size_traits-'].update(size_table)
+		self.window['-table_sell_percent_traits-'].update(sell_percent_table)
+		self.window['-table_sell_account_traits-'].update(sell_account_table)
+		self.window['-table_stop_percent_traits-'].update(stop_percent_table)
+		self.window['-table_stop_account_traits-'].update(stop_account_table)
 		if os.path.exists('C:/Stocks/local/account/trait.png'):
 			image = PIL.Image.open('C:/Stocks/local/account/trait.png')
 			bio = io.BytesIO()
 			image.save(bio, format="PNG")
 			self.window['-CHART-'].update(data = bio.getvalue())
-
+			#######
 	def build_optimal_traits_table(self):
-		sell_table = []
+		current_pnl = sum(self.df_traits['pnl $'])
+		print(self.df_traits[['min a','pnl $']].sort_values('min a',ascending = False))
 		traits = self.df_traits.dropna().reset_index(drop = True)
-		for thresh in [x/4 for x in range(1,81)]:
-			df = traits
+		sell_percent_table = []
+		for thresh in [x/8 for x in range(1,161)]:
+			df = traits.copy()
 			for i in range(len(df)):
 				if df.at[i,'max %'] >= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
 				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
-			sell_table.append([thresh,sum(df['pnl $'].tolist())])
-		stop_table = []
-		for thresh in [x/16 for x in range(0,-41,-1)]:
-			df = traits
+			sell_percent_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
+
+		sell_account_table = []
+		for thresh in [x/8 for x in range(1,161)]:
+			df = traits.copy()
+			for i in range(len(df)):
+				if df.at[i,'max a'] >= thresh: df.at[i,'pnl $'] = df.at[i,'account_size'] * thresh / 100
+				elif df.at[i,'pnl $'] > 0: df.at[i,'pnl $'] = 0
+			sell_account_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
+
+		stop_percent_table = []
+		for thresh in [x/16 for x in range(0,-81,-1)]:
+			df = traits.copy()
 			for i in range(len(df)):  
 				if df.at[i,'min %'] <= thresh: df.at[i,'pnl $'] = df.at[i,'size $'] * thresh / 100
-			stop_table.append([thresh,sum(df['pnl $'].tolist())])
-		size_table = []
-		for thresh in range(5,205,5):
-			df = traits
-			for i in range(len(df)): df.at[i,'pnl $'] *= (thresh/df.at[i,'size %'])
-			size_table.append([thresh,sum(df['pnl $'].tolist())])
-		return sell_table, stop_table, size_table
+			stop_percent_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
+
+		stop_account_table = []
+		for thresh in [x/16 for x in range(0,-81,-1)]:
+			df = traits.copy()
+			for i in range(len(df)):  
+				if df.at[i,'min a'] <= thresh: df.at[i,'pnl $'] = df.at[i,'account_size'] * thresh / 100
+			stop_account_table.append([thresh,sum(df['pnl $'].tolist()) - current_pnl])
+
+
+		return sell_percent_table, sell_account_table, stop_percent_table, stop_account_table
 
 	def calc_trait_values(df,title):
 		avg_loss = df[df['pnl a'] <= 0]['pnl a'].mean()
@@ -298,7 +320,7 @@ class Traits:
 			else: wins.append(0)
 		win = statistics.mean(wins) * 100
 		high = df['max %'].mean()
-		max_time = df['high time'].mean()
+		max_time = df['max time'].mean()
 		miss = df['miss %'].mean()
 		risk = df[df['risk %'] > 0]['risk %'].mean()
 		size = df[df['size %'] > 0]['size %'].mean()
@@ -418,8 +440,7 @@ class Traits:
 		size_dollars = 0
 		total_size = 0
 		current_pnl = 0
-		high_price = float(first_trade[3])
-		low_price = float(first_trade[3])
+		
 		for i in range(len(trades)):
 			date = trades[i][1]
 			shares = float(trades[i][2])
@@ -468,6 +489,9 @@ class Traits:
 			size = 0
 			min_time = 0
 			max_time = 0
+			trade_open_price = float(first_trade[3])
+			high_price = trade_open_price
+			low_price = trade_open_price
 			for i in range(len(df_1min)):
 				date = df_1min.index[i]
 				low = df_1min.iat[i,low_col]
@@ -479,6 +503,7 @@ class Traits:
 					if low*direction < low_price*direction: 
 						low_price = low
 						min_time = (data.format_date(date) - open_datetime).days
+				
 				else:
 					if direction*low < direction*lod_price:
 						lod_price = low
@@ -504,12 +529,14 @@ class Traits:
 			pnl_percent = ((pnl_dollars / size_dollars)) * 100
 			pnl_account = ((pnl_dollars / account_size)) * 100
 			min_account = (low_dollars / account_size - 1)*100
-			risk_percent = ( float(trades[0][3]) / lod_price - 1) * 100 * direction
-			max_percent = ((high_price / float(first_trade[3])) - 1) * 100 * direction
-			min_percent = ((low_price / float(first_trade[3])) - 1) * 100 * direction
+			risk_percent = ( trade_open_price / lod_price - 1) * 100 * direction
+			max_percent = ((high_price / trade_open_price) - 1) * 100 * direction
+			min_percent = ((low_price / trade_open_price) - 1) * 100 * direction
 			max_account = (high_dollars / account_size) * 100
 			min_account = (low_dollars / account_size) * 100
 			miss_percent = max_percent - pnl_percent
+			if pnl_percent < min_percent: min_percent = pnl_percent
+
 		else:
 			risk_percent = pd.NA
 			min_percent = pd.NA
@@ -527,8 +554,9 @@ class Traits:
 		traits = pd.DataFrame({
 		'ticker': [ticker], 'datetime':[open_datetime], 'trades': [trades], 'setup':[setup], 'pnl $':[try_round(pnl_dollars)], 
 		'pnl %':[try_round(pnl_percent)], 'pnl a':[try_round(pnl_account)], 'size $':[try_round(size_dollars)], 'size %':[try_round(size_percent)],  
-		'max %':[try_round(max_percent)], 'high time':[max_time],'max a':[try_round(max_account)],'miss %':[try_round(miss_percent)],
-	   'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)], 'min time':[try_round(min_time)],'min a':[try_round(min_account)], 'arrow_list':[arrow_list], 'closed':[try_round(closed)], 
+		'max %':[try_round(max_percent)], 'max time':[max_time],'max a':[try_round(max_account)],'miss %':[try_round(miss_percent)],
+	   'risk %':[try_round(risk_percent)], 'min %':[try_round(min_percent)], 'min time':[try_round(min_time)],'min a':[try_round(min_account)], 
+	   'account_size':[account_size],'arrow_list':[arrow_list], 'closed':[try_round(closed)], 
 	   'open':[0], 'high':[try_round(high_dollars)], 'low':[try_round(low_dollars)], 'close':[try_round(pnl_dollars)],'volume':[try_round(total_size)]})
 		return traits
 
@@ -724,11 +752,11 @@ class Plot:
 	def plot(self):
 		if self.event == 'Load': Plot.sort(self)
 		elif self.event == 'Next' :
-			if self.i == len(self.df_traits) - 1: self.i = 0
+			if self.i == len(self.sorted_traits) - 1: self.i = 0
 			else: self.i += 1
 			Plot.preload(self)
 		elif self.event == 'Prev':
-			if self.i == 0: self.i = len(self.df_traits) - 1
+			if self.i == 0: self.i = len(self.sorted_traits) - 1
 			else: self.i -= 1
 			Plot.preload(self)
 		Plot.update(self)
@@ -751,7 +779,7 @@ class Plot:
 		trades = bar['trades']
 		trade_table = [[datetime.datetime.strptime(trades[k][1], '%Y-%m-%d %H:%M:%S'),(float(trades[k][2])),float(trades[k][3])] for k in range(len(trades))]
 		trait_table = [[bar[trait] for trait in trait_headings]]
-		self.window["-number-"].update(str(f"{self.i + 1} of {len(self.df_traits)}"))
+		self.window["-number-"].update(str(f"{self.i + 1} of {len(self.sorted_traits)}"))
 		self.window["-trait_table-"].update(trait_table)
 		self.window["-trade_table-"].update(trade_table)
 		for i in range(3):
@@ -761,7 +789,7 @@ class Plot:
 					bio = io.BytesIO()
 					image.save(bio, format="PNG")
 					self.window[f'-IMAGE{i}-'].update(data = bio.getvalue())
-				except (PIL.UnidentifiedImageError, FileNotFoundError, OSError, SyntaxError) as e: pass
+				except (PIL.UnidentifiedImageError, FileNotFoundError, OSError, SyntaxError): pass
 				else: break
 		self.window.maximize()
 
@@ -769,7 +797,7 @@ class Plot:
 		helper_list = list(range(len(self.sorted_traits))) + list(range(len(self.sorted_traits)))
 		if self.i == 0: index_list = [0,1,-1,2,-2,3,-3,4,-4,5,-5,6,-6,7,-7,8,-8,9,-9]
 		else: index_list = [self.i + 9, self.i - 9]
-		arglist = [[helper_list[i],self.sorted_traits,False] for i in index_list]
+		arglist = [[helper_list[i],self.sorted_traits,False] for i in index_list if abs(i) < len(helper_list) ]
 		self.pool.map_async(Plot.create,arglist)
 
 	def sort(self):
