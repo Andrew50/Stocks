@@ -237,7 +237,7 @@ class Data:
 			weekday = datetime.datetime.now().weekday()
 			if weekday%3 == 0:
 				for s in setup_list: Data.train(s,.05,200)
-			if  weekday == 4: Data.backup()
+			if weekday == 4: Data.backup()
 
 	def update(bar):
 		ticker = bar[0]
@@ -419,4 +419,7 @@ class Data:
 		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	Data.run()
+	Data.consolidate_database()
+	setup_list = Data.get_setups_list()
+	for s in setup_list: Data.train(s,.05,200)
+	#Data.run()
