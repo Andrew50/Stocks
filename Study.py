@@ -14,7 +14,7 @@ class Study:
         if not self.current:
             self.sub_st_list = {}
             setups_df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
-            for st in data.get_st_list():
+            for st in data.get_setups_list():
                 df = setups_df[setups_df['st'] == st]
                 sub_st_list = [*set(df['sub_st'].to_list())]
                 self.sub_st_list.update({st:[s for s in sub_st_list if s != st]})
@@ -207,4 +207,4 @@ class Study:
         self.window.maximize()
 
 if __name__ == "__main__":
-    Study.run(Study,True)
+    Study.run(Study,False)

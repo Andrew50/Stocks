@@ -419,4 +419,4 @@ class Data:
 		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	Data.run()
+	Data.refill_backtest() ###
