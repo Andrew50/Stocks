@@ -225,6 +225,7 @@ class Data:
 		current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
 		from Screener import Screener as screener
 		scan = screener.get('full',True)
+		scan = ['NFLX']
 		batches = []
 		for i in range(len(scan)):
 		   ticker = scan[i]
@@ -235,9 +236,9 @@ class Data:
 		if Data.get_config("Data identity") == 'desktop':
 			setup_list = Data.get_setups_list()
 			weekday = datetime.datetime.now().weekday()
-			if weekday%3 == 0:
-				for s in setup_list: Data.train(s,.05,200)
 			if weekday == 4: Data.backup()
+			elif weekday == 5:
+				for s in setup_list: Data.train(s,.05,200)
 
 	def update(bar):
 		ticker = bar[0]
@@ -247,7 +248,9 @@ class Data:
 		try:
 			df = feather.read_feather(Data.data_path(ticker,tf))
 			last_day = df.index[-1] 
-			if last_day == current_day: return
+			if last_day == current_day: 
+				print('god')
+				return
 		except: exists = False
 		if tf == 'd':
 			ytf = '1d'
@@ -267,8 +270,10 @@ class Data:
 			ydf = ydf[index + 1:]
 			df = pd.concat([df, ydf])
 		df.index.rename('datetime', inplace = True)
-		if tf == '1min': df = df.between_time('09:30', '15:59')
-		if not df.empty: feather.write_feather(df,Data.data_path(ticker,tf))
+		if not df.empty: 
+			if tf == '1min': df = df.between_time('09:30', '15:59')
+			elif tf == 'd': df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
+			feather.write_feather(df,Data.data_path(ticker,tf))
 
 	def get_config(name):
 		s  = open("C:/Stocks/config.txt", "r").read()
@@ -396,10 +401,11 @@ class Data:
 	def is_market_open():
 		dayOfWeek = datetime.datetime.now().weekday()
 		if(dayOfWeek == 5 or dayOfWeek == 6): return 0
-		hour = datetime.datetime.now().hour
-		minute = datetime.datetime.now().minute
-		if hour > 5 and hour < 12: return 1
-		elif hour == 5 and minute >= 30: return 1
+		dt = datetime.datetime.now(pytz.timezone('US/Eastern'))
+		hour = dt.hour
+		minute = dt.minute
+		if hour >= 10 and hour <= 16: return 1
+		elif hour == 9 and minute >= 30: return 1
 		return 0
 
 	def pool(deff,arg):
@@ -419,4 +425,4 @@ class Data:
 		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	Data.refill_backtest()
+	Data.run()

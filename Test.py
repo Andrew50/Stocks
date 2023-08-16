@@ -5,22 +5,20 @@ import pandas as pd
 import os
 import time
 from tvDatafeed import TvDatafeed
+import pytz
 
-#print(data.get_setups_list())
-
-
-
-path = "C:/Stocks/sync/database/"
-dir_list = os.listdir(path)
-for p in dir_list:
-	d = path + p
+print(data.get())
+#path = "C:/Stocks/sync/database/"
+#dir_list = os.listdir(path)
+#for p in dir_list:
+#	d = path + p
 	
-	df = pd.read_feather(d)
-	df.rename(columns={'date':'dt','req':'required','setup':'value'}, inplace = True)	
-	for i in range(len(df)):
-		if data.is_pre_market( df.at[i,'dt']):
-			df.at[i,'dt'] =  df.at[i,'dt'].replace(hour=9, minute=30)
-	df.to_feather(d)
+#	df = pd.read_feather(d)
+#	df.rename(columns={'date':'dt','req':'required','setup':'value'}, inplace = True)	
+#	for i in range(len(df)):
+#		if data.is_pre_market( df.at[i,'dt']):
+#			df.at[i,'dt'] =  df.at[i,'dt'].replace(hour=9, minute=30)
+#	df.to_feather(d)
 
 
 
