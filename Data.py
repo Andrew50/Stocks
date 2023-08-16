@@ -419,7 +419,4 @@ class Data:
 		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	Data.consolidate_database()
-	setup_list = Data.get_setups_list()
-	for s in setup_list: Data.train(s,.05,200)
-	#Data.run()
+	Data.refill_backtest()
