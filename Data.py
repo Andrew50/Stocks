@@ -225,19 +225,19 @@ class Data:
 		current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
 		from Screener import Screener as screener
 		scan = screener.get('full',True)
-		scan = ['NFLX']
 		batches = []
 		for i in range(len(scan)):
 		   ticker = scan[i]
 		   batches.append([ticker, current_day, 'd'])
 		   batches.append([ticker, current_minute, '1min'])
 		Data.pool(Data.update, batches)
-		Data.refill_backtest()
-		if Data.get_config("Data identity") == 'desktop':
-			setup_list = Data.get_setups_list()
+		ident = Data.get_config("Data identity")
+		if ident == 'laptop': Data.refill_backtest()
+		elif ident == 'desktop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
 			elif weekday == 5:
+				setup_list = Data.get_setups_list()
 				for s in setup_list: Data.train(s,.05,200)
 
 	def update(bar):
@@ -248,9 +248,7 @@ class Data:
 		try:
 			df = feather.read_feather(Data.data_path(ticker,tf))
 			last_day = df.index[-1] 
-			if last_day == current_day: 
-				print('god')
-				return
+			if last_day == current_day: return
 		except: exists = False
 		if tf == 'd':
 			ytf = '1d'
