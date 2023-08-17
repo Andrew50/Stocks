@@ -194,7 +194,7 @@ class Data:
 		x, y, info = Data.format(dfs,(dt == None))
 		return x, y, info, dfs
 
-	def get_requirements(ticker, df, st = ''):
+	def get_requirements(ticker, df, st):
 
 		def pm_dol_vol(df):
 			time = datetime.time(0,0,0)
@@ -216,6 +216,7 @@ class Data:
 		dol_vol_req = reqs[0] * 1000000
 		adr_req = reqs[1]
 		pm_dol_vol_req = reqs[2] * 1000000
+		print(f'{adr_req} {dol_vol_req}')
 		if statistics.mean(adr_list) > adr_req and (statistics.mean(dol_vol_list) > dol_vol_req or pm_dol_vol(df) > pm_dol_vol_req): return True
 		return False
 
