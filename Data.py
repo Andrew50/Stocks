@@ -5,11 +5,10 @@ from tqdm import tqdm
 from pyarrow import feather
 from tvDatafeed import TvDatafeed
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import load_model
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from multiprocessing import Pool, current_process
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
-import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz
+import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow
 warnings.filterwarnings("ignore")
 
 class Data:
@@ -137,6 +136,7 @@ class Data:
 		model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
 		model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
 		model.save('C:/Stocks/sync/models/model_' + st)
+		tensorflow.keras.backend.clear_session()
 
 	def sample(st,use):
 
@@ -238,8 +238,10 @@ class Data:
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
 			elif weekday == 5:
+				Data.consolidate_database()
 				setup_list = Data.get_setups_list()
 				for s in setup_list: Data.train(s,.05,200)
+
 
 	def update(bar):
 		ticker = bar[0]

@@ -1,4 +1,3 @@
-import pathlib, time, selenium, datetime, os, math
 import pandas as pd
 import numpy as np
 import mplfinance as mpf
@@ -9,6 +8,7 @@ from discordwebhook import Discord
 import selenium.webdriver as webdriver
 from selenium.webdriver.common.by import By 
 from selenium.webdriver.firefox.options import Options 
+import pathlib, time, selenium, datetime, os, math, tensorflow
 
 class Screener:
 
@@ -45,6 +45,7 @@ class Screener:
 			for i in range(num_dfs):
 				d = df[int(s*i):int(s*(i+1))].reset_index(drop = True)
 				if not d.empty: values.append(pool.apply_async(data.create_arrays,args = ([d]))) 
+			tensorflow.keras.backend.clear_session()
 			model_list = [[st,data.load_model(st)] for st in data.get_config('Screener active_setup_list').split(',') if tf in st]
 			x = np.concatenate([bar.get()[0] for bar in values])
 			info = np.concatenate([bar.get()[2] for bar in values])
