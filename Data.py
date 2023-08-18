@@ -63,7 +63,7 @@ class Data:
 				try: df = df[:Data.findex(df,dt) + 1]
 				except: pass
 				else:
-					if Data.get_requirements(ticker, df,st): setups.append([ticker,dt,score,df])
+					if Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
 		return setups
 
 	def format(dfs, use_whole_df = False):
@@ -74,7 +74,7 @@ class Data:
 			for n in range(0, num_feats): x_reshaped[:, :, n] = x[:, n*FEAT_LENGTH:(n+1)*FEAT_LENGTH]
 			return x_reshaped
 
-		arglist = [[dfs[i],use_whole_df,i] for i in range(len(dfs))]
+		arglist = [[dfs[i],use_whole_df] for i in range(len(dfs))]
 		if current_process().name == 'MainProcess': dfs = Data.pool(Data.worker,arglist)
 		else:
 			dfs = []
@@ -113,7 +113,7 @@ class Data:
 		try: value = df['value'][0]
 		except: value = 0
 		use_whole_df = bar[1]
-		key = bar[2]
+		key = df['key'][0]
 		sample_size = 100
 		if use_whole_df:
 			add = pd.DataFrame(df.iat[-1,3], index = np.arange(sample_size), columns = df.columns)
@@ -188,6 +188,7 @@ class Data:
 			data = Data.get(ticker,tf,dt)
 			if not data.empty: 
 				data['value'] = value
+				data['key'] = df.index[i]
 				dfs.append(data)
 			pbar.update(1)
 		pbar.close()
@@ -209,14 +210,13 @@ class Data:
 		if ma_length > length - 1: ma_length = length - 1
 		adr_list = []
 		dol_vol_list = []
-		for i in range(ma_length):
-			adr_list.append((df.iat[-i-2,1]/df.iat[-i-2,2] - 1) * 100)
-			dol_vol_list.append(df.iat[-2-i,3]*df.iat[-2-i,4])
+		for i in range(-1,-ma_length-1,-1):
+			adr_list.append((df.iat[i,1]/df.iat[i,2] - 1) * 100)
+			dol_vol_list.append(df.iat[i,3]*df.iat[i,4])
 		reqs = [float(r) for r in Data.get_config(f'Screener {st}').split(',')]
 		dol_vol_req = reqs[0] * 1000000
 		adr_req = reqs[1]
 		pm_dol_vol_req = reqs[2] * 1000000
-		print(f'{adr_req} {dol_vol_req}')
 		if statistics.mean(adr_list) > adr_req and (statistics.mean(dol_vol_list) > dol_vol_req or pm_dol_vol(df) > pm_dol_vol_req): return True
 		return False
 
@@ -420,10 +420,10 @@ class Data:
 		return False
 
 	def data_path(ticker,tf):
-		drive = Data.get_config('Data data_drive_letter')
 		if 'd' in tf or 'w' in tf: path = 'd/' 
 		else: path = '1min/'
-		return drive + ':/Stocks/local/data/' + path + ticker + '.feather'
+		return Data.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	Data.run()
+	#Data.run()
+	Data.refill_backtest()

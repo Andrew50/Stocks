@@ -8,7 +8,9 @@ from tvDatafeed import TvDatafeed
 import pytz
 
 
-
+df = data.get('UAUG',dt = '2020-04-13')
+print(df)
+print(data.get_requirements('',df,'d_EP'))
 #path = "C:/Stocks/sync/database/"
 #dir_list = os.listdir(path)
 #for p in dir_list:
