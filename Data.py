@@ -228,12 +228,12 @@ class Data:
 		scan = screener.get('full',True)
 		batches = []
 		for i in range(len(scan)):
-		   ticker = scan[i]
-		   batches.append([ticker, current_day, 'd'])
-		   batches.append([ticker, current_minute, '1min'])
+			ticker = scan[i]
+			batches.append([ticker, current_day, 'd'])
+			batches.append([ticker, current_minute, '1min'])
 		Data.pool(Data.update, batches)
 		ident = Data.get_config("Data identity")
-		if ident == 'laptop': Data.refill_backtest()
+		if (ident == 'laptop') or ident == 'ben_laptop': Data.refill_backtest()
 		elif ident == 'desktop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
@@ -362,7 +362,7 @@ class Data:
 		setups = Data.get_setups_list()
 		for setup in setups:
 			df = pd.DataFrame()
-			for ident in ['ben_','desktop_','laptop_']:
+			for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
 				try: 
 					df1 = pd.read_feather(f"C:/Stocks/sync/database/{ident}{setup}.feather").dropna()
 					df1['sindex'] = df1.index
@@ -392,6 +392,7 @@ class Data:
 		if isinstance(dt,str):
 			try: dt = datetime.datetime.strptime(dt, '%Y-%m-%d')
 			except: dt = datetime.datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+		print(f"{dt.hour} {dt.minute} {dt}")
 		time = datetime.time(dt.hour,dt.minute,0)
 		dt = datetime.datetime.combine(dt.date(),time)
 		if dt.hour == 0 and dt.minute == 0:

@@ -61,7 +61,7 @@ class Study:
             else: index_list = [float(i/2) for i in range(40)]
         else: index_list = [19 + self.i]
         arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
-        self.pool.map_async(self.plot,arglist)
+        self.pool.map(self.plot,arglist)
         
     def filter(self):
         try:

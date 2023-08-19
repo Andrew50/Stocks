@@ -6,11 +6,28 @@ import os
 import time
 from tvDatafeed import TvDatafeed
 import pytz
+'''
+df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
+lis = ""
+
+text_file = open(r"C:/Stocks/full_ticker_list_list.txt", 'w')
+for i in range(len(df)):
+	if('/' not in str(df.iloc[i]['Ticker'])):
+		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
+text_file.close()'''
 
 
-df = data.get('UAUG',dt = '2020-04-13')
-print(df)
-print(data.get_requirements('',df,'d_EP'))
+directory = 'C:/Stocks/local/data/1min_2/'
+
+for filename in os.listdir(directory):
+	f = os.path.join(directory, filename)
+	last = str(filename)[-3:]
+	ticker = filename.split('.')[0]
+	print(ticker + f' {last}')
+	if(last == 'csv'):
+		df = pd.read_csv(f)
+		df.to_feather(f'C:/Stocks/local/data/1min_2/{ticker}.feather')
+		os.remove(f)
 #path = "C:/Stocks/sync/database/"
 #dir_list = os.listdir(path)
 #for p in dir_list:
