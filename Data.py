@@ -425,5 +425,4 @@ class Data:
 		return Data.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
 
 if __name__ == '__main__':
-	#Data.run()
-	Data.refill_backtest()
+	Data.run()
