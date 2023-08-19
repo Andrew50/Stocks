@@ -58,8 +58,8 @@ class Log:
 		elif self.event == 'Pull': Log.pull(self)
 		elif self.event == 'Enter': Log.manual_log(self)
 		elif self.event == 'Delete':
-			updated_log = self.df_log.drop(self.index).reset_index(drop = True)
-			Log.recalc(self,updated_log)
+			updated_log = self.df_log.drop(self.log_index).reset_index(drop = True)
+			Log.queue_recalcs(self,updated_log)
 		elif self.event == 'Clear': 
 			if self.log_index == None: Log.update_inputs(self)
 			else: 
@@ -69,8 +69,7 @@ class Log:
 			try:
 				self.log_index = self.values['-log_table-'][0]
 				Log.update_inputs(self)
-			except IndexError:
-				pass
+			except IndexError: pass
 
 	def update(self):
 		if self.init:
@@ -202,6 +201,7 @@ class Log:
 			updated_log =  dfn
 		else:
 			raise Exception('no pull method created')
+		if not self.df_log.empty: updated_log = pd.concat([updated_log,self.df_log[self.df_log['ticker'] == 'Deposit']]).sort_values('datetime',ascending = False).reset_index(drop = True)
 		Log.queue_recalcs(self,updated_log)
 
 class Traits:
@@ -276,7 +276,6 @@ class Traits:
 			
 	def build_optimal_traits_table(self):
 		current_pnl = sum(self.df_traits['pnl $'])
-		print(self.df_traits[['min a','pnl $']].sort_values('min a',ascending = False))
 		traits = self.df_traits.dropna().reset_index(drop = True)
 		sell_percent_table = []
 		for thresh in [x/8 for x in range(1,161)]:
@@ -622,7 +621,8 @@ class Account:
 			pnl = 0
 			deposits = 0
 		else:
-			index = data.findex(self.df_pnl,date_list[0]) 
+			if date_list[0] > self.df_pnl.index[-1]: index = len(self.df_pnl)
+			else: index = data.findex(self.df_pnl,date_list[0]) 
 			self.df_pnl = self.df_pnl[:index]
 			bar = self.df_pnl.iloc[-1]
 			open_positions_list = bar['positions'].split(',')
