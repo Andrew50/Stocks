@@ -232,16 +232,14 @@ class Data:
 		   batches.append([ticker, current_day, 'd'])
 		   batches.append([ticker, current_minute, '1min'])
 		Data.pool(Data.update, batches)
-		ident = Data.get_config("Data identity")
-		if ident == 'laptop': Data.refill_backtest()
-		elif ident == 'desktop':
+		if Data.get_config("Data identity") == 'desktop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
 			elif weekday == 5:
 				Data.consolidate_database()
 				setup_list = Data.get_setups_list()
 				for s in setup_list: Data.train(s,.05,200)
-
+		else: Data.refill_backtest()
 
 	def update(bar):
 		ticker = bar[0]
