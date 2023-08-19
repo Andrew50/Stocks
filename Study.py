@@ -87,7 +87,7 @@ class Study:
                                 if 'annotation' in trait: df = df[df[trait].str.contains(val)]
                                 else: df = df[df[trait] == val]
                 if sort_by != None: df = df.sort_values(by = [sort_by], ascending = False)
-                else:df = df.sample(frac = 1)
+                else: df = df.sample(frac = 1)
             if df.empty: raise TimeoutError
             self.setups_data = df
             self.i = 0.0

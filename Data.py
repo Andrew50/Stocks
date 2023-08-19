@@ -232,16 +232,14 @@ class Data:
 			batches.append([ticker, current_day, 'd'])
 			batches.append([ticker, current_minute, '1min'])
 		Data.pool(Data.update, batches)
-		ident = Data.get_config("Data identity")
-		if (ident == 'laptop') or ident == 'ben_laptop': Data.refill_backtest()
-		elif ident == 'desktop':
+		if Data.get_config("Data identity") == 'desktop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
 			elif weekday == 5:
 				Data.consolidate_database()
 				setup_list = Data.get_setups_list()
 				for s in setup_list: Data.train(s,.05,200)
-
+		else: Data.refill_backtest()
 
 	def update(bar):
 		ticker = bar[0]
@@ -330,7 +328,7 @@ class Data:
 		try: historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 		except: historical_setups = pd.DataFrame()
 		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"): shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-		while historical_setups.empty or (len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
+		while historical_setups.empty or (len(historical_setups[historical_setups["pre_annotation"] == ""]) < 1500):
 			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather").sample(frac=1)
 			screener.run(ticker = full_list_minus_annotation[:20]['ticker'].tolist(), fpath = 0)
 			full_list_minus_annotation = full_list_minus_annotation[20:].reset_index(drop=True)

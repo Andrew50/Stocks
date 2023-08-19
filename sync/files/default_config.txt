@@ -17,8 +17,8 @@
 	1min_VF = .03,0,inf
 -Study 
 	ui_scale = 2.5
-	chart_size = .49
-	chart_aspect_ratio = 2
+	chart_size = .58
+	chart_aspect_ratio = 1.92
 	chart_dpi = 330
 -Trainer
 	ui_scale = 3.3
