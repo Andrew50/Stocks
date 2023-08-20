@@ -19,7 +19,8 @@ class Data:
 			dt = Data.format_date(dt)
 			if 'd' in tf or 'w' in tf: base_tf = '1d'
 			else: base_tf = '1min'
-			try: df = feather.read_feather(Data.data_path(ticker,tf))
+			#try: df = feather.read_feather(Data.data_path(ticker,tf))
+			try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
 			except FileNotFoundError: df = pd.DataFrame()
 			if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
 				try: 
@@ -35,6 +36,7 @@ class Data:
 			if dt != None and not Data.is_pre_market(dt):
 				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
 				except IndexError: raise TimeoutError
+			if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
 			if 'w' in tf and not Data.is_pre_market(dt):
 				last_bar = df.tail(1)
 				df = df[:-1]
@@ -222,15 +224,17 @@ class Data:
 
 	def run():
 		Data.check_directories()
-		current_day = Data.format_date(yf.download(tickers = 'QQQ', period = '25y', group_by='ticker', interval = '1d', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
-		current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
+		#current_day = Data.format_date(yf.download(tickers = 'QQQ', period = '25y', group_by='ticker', interval = '1d', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
+		#current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
 		from Screener import Screener as screener
-		scan = screener.get('full',True)
+		scan = screener.get('full',True)[:2]
 		batches = []
+		#for i in range(len(scan)):
+		#   ticker = scan[i]
+		#   batches.append([ticker, current_day, 'd'])
+		#   batches.append([ticker, current_minute, '1min'])
 		for i in range(len(scan)):
-			ticker = scan[i]
-			batches.append([ticker, current_day, 'd'])
-			batches.append([ticker, current_minute, '1min'])
+			for tf in ['d','1min']: batches.append([scan[i],tf])
 		Data.pool(Data.update, batches)
 		if Data.get_config("Data identity") == 'desktop':
 			weekday = datetime.datetime.now().weekday()
@@ -243,13 +247,14 @@ class Data:
 
 	def update(bar):
 		ticker = bar[0]
-		current_day = bar[1]
-		tf = bar[2]
+		#current_day = bar[1]
+		#tf = bar[2]
+		tf = bar[1]
 		exists = True
 		try:
-			df = feather.read_feather(Data.data_path(ticker,tf))
+			df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)######
 			last_day = df.index[-1] 
-			if last_day == current_day: return
+			#if last_day == current_day and False: return
 		except: exists = False
 		if tf == 'd':
 			ytf = '1d'
@@ -257,7 +262,8 @@ class Data:
 		else:
 			ytf = '1m'
 			period = '5d'
-		ydf = yf.download(tickers = ticker, period = period, group_by='ticker', interval = ytf, ignore_tz = True, progress=False, show_errors = False, threads = False, prepost = False) 
+		ydf = yf.download(tickers = ticker, period = period, group_by='ticker', interval = ytf, ignore_tz = True, progress=False, show_errors = False, threads = False, prepost = True) 
+		#ydf = yf.download(tickers = ticker, period = period, group_by='ticker', interval = ytf, ignore_tz = True, progress=False, show_errors = False, threads = False, prepost = False) 
 		ydf.drop(axis=1, labels="Adj Close",inplace = True)
 		ydf.rename(columns={'Open':'open','High':'high','Low':'low','Close':'close','Volume':'volume'}, inplace = True)
 		ydf.dropna(inplace = True)
@@ -270,8 +276,10 @@ class Data:
 			df = pd.concat([df, ydf])
 		df.index.rename('datetime', inplace = True)
 		if not df.empty: 
-			if tf == '1min': df = df.between_time('09:30', '15:59')
+			if tf == '1min': pass
+				#df = df.between_time('09:30', '15:59')
 			elif tf == 'd': df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
+			df = df.reset_index()
 			feather.write_feather(df,Data.data_path(ticker,tf))
 
 	def get_config(name):

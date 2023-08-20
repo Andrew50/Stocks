@@ -3,6 +3,9 @@ import datetime
 from Screener import Screener as screener
 import pandas as pd
 import os
+import yfinance as yf
+from tqdm import tqdm
+
 import time
 from tvDatafeed import TvDatafeed
 import pytz
@@ -16,18 +19,38 @@ for i in range(len(df)):
 		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
 text_file.close()'''
 
+#print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
 
-directory = 'C:/Stocks/local/data/1min_2/'
+path = "C:/Stocks/local/data/d_2/"
+path2 = "C:/Stocks/local/data/god/"
+dir_list = os.listdir(path)
+pbar = tqdm(total = len(dir_list))
+for p in dir_list:
+	df = pd.read_csv(path+p)
+	#df = df.set_index('datetime',drop = True)
+	df['datetime'] = pd.to_datetime(df['datetime'])
+	df.to_feather(path2+(p.split('.')[0]) + '.feather')
+	pbar.update(1)
+pbar.close()
+	
 
-for filename in os.listdir(directory):
-	f = os.path.join(directory, filename)
-	last = str(filename)[-3:]
-	ticker = filename.split('.')[0]
-	print(ticker + f' {last}')
-	if(last == 'csv'):
-		df = pd.read_csv(f)
-		df.to_feather(f'C:/Stocks/local/data/1min_2/{ticker}.feather')
-		os.remove(f)
+			
+				
+
+#path = "C:/Stocks/local/data/d/"
+#dir_list = os.listdir(path)
+#pbar = tqdm(total = len(dir_list))
+#for p in dir_list:
+#	df = pd.read_feather(path+p)
+#	df = df.reset_index()
+#	df.to_feather(path+p)
+#	pbar.update(1)
+#pbar.close()
+
+
+#df = (yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = True))
+#print(df)
+#print(data.get_requirements('',df,'d_EP'))
 #path = "C:/Stocks/sync/database/"
 #dir_list = os.listdir(path)
 #for p in dir_list:
