@@ -3,13 +3,45 @@ import datetime
 from Screener import Screener as screener
 import pandas as pd
 import os
+import yfinance as yf
+from tqdm import tqdm
+
 import time
 from tvDatafeed import TvDatafeed
 import pytz
 
 
-df = data.get('AAPL',tf = 'w')
-print(df)
+print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
+
+#path = "C:/Stocks/local/data/d_2/"
+#path2 = "C:/Stocks/local/data/god/"
+#dir_list = os.listdir(path)
+#pbar = tqdm(total = len(dir_list))
+#for p in dir_list:
+#	df = pd.read_csv(path+p)
+#	#df = df.set_index('datetime',drop = True)
+#	df['datetime'] = pd.to_datetime(df['datetime'])
+#	df.to_feather(path2+(p.split('.')[0]) + '.feather')
+#	pbar.update(1)
+#pbar.close()
+	
+
+			
+				
+
+#path = "C:/Stocks/local/data/d/"
+#dir_list = os.listdir(path)
+#pbar = tqdm(total = len(dir_list))
+#for p in dir_list:
+#	df = pd.read_feather(path+p)
+#	df = df.reset_index()
+#	df.to_feather(path+p)
+#	pbar.update(1)
+#pbar.close()
+
+
+#df = (yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = True))
+#print(df)
 #print(data.get_requirements('',df,'d_EP'))
 #path = "C:/Stocks/sync/database/"
 #dir_list = os.listdir(path)
