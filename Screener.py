@@ -1,3 +1,4 @@
+from re import S
 import pandas as pd
 import numpy as np
 import mplfinance as mpf
@@ -8,6 +9,7 @@ from discordwebhook import Discord
 import selenium.webdriver as webdriver
 from selenium.webdriver.common.by import By 
 from selenium.webdriver.firefox.options import Options 
+from selenium.webdriver.firefox.service import Service
 import pathlib, time, selenium, datetime, os, math, tensorflow
 
 class Screener:
@@ -78,12 +80,13 @@ class Screener:
 	def get(type = 'full', refresh = False, browser = None):
 
 		def start_firefox():
-			options = Options()
+			options = webdriver.FirefoxOptions()
 			options.binary_location = r"C:\Program Files\Mozilla Firefox\firefox.exe"
-			options.headless = True
+			options.headless = False
+			service = Service(executable_path=os.path.join(os.getcwd(), 'Drivers', 'geckodriver.exe'))
 			FireFoxProfile = webdriver.FirefoxProfile()
 			FireFoxProfile.set_preference("General.useragent.override", 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0')
-			browser = webdriver.Firefox(options=options, executable_path=os.path.join(os.getcwd(), 'Drivers', 'geckodriver.exe'))
+			browser = webdriver.Firefox(options=options, service=service)
 			browser.implicitly_wait(7)
 			browser.set_window_size(2560, 1440)
 			browser.get("https://www.tradingview.com/screener/")
@@ -146,7 +149,7 @@ class Screener:
 				time.sleep(0.25)
 				browser.find_element(By.XPATH, '//div[@data-field="relative_volume_intraday.5"]').click()
 				browser.find_element(By.XPATH, '//div[@data-name="screener-export-data"]').click()
-			except: print('manual csv fetch required')
+			except Exception as e: print('manual csv fetch required ' + str(e))
 			found = False
 			today = str(datetime.date.today())
 			while True:
@@ -194,4 +197,4 @@ class Screener:
 
 if __name__ == '__main__':
 	Screener.run('current')
-	study.run(study,True)
+	#study.run(study,True)
