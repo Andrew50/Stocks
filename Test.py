@@ -11,19 +11,19 @@ from tvDatafeed import TvDatafeed
 import pytz
 
 
-print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
+#print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
 
-#path = "C:/Stocks/local/data/d_2/"
-#path2 = "C:/Stocks/local/data/god/"
-#dir_list = os.listdir(path)
-#pbar = tqdm(total = len(dir_list))
-#for p in dir_list:
-#	df = pd.read_csv(path+p)
-#	#df = df.set_index('datetime',drop = True)
-#	df['datetime'] = pd.to_datetime(df['datetime'])
-#	df.to_feather(path2+(p.split('.')[0]) + '.feather')
-#	pbar.update(1)
-#pbar.close()
+path = "C:/Stocks/local/data/d_2/"
+path2 = "C:/Stocks/local/data/god/"
+dir_list = os.listdir(path)
+pbar = tqdm(total = len(dir_list))
+for p in dir_list:
+	df = pd.read_csv(path+p)
+	#df = df.set_index('datetime',drop = True)
+	df['datetime'] = pd.to_datetime(df['datetime'])
+	df.to_feather(path2+(p.split('.')[0]) + '.feather')
+	pbar.update(1)
+pbar.close()
 	
 
 			
