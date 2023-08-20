@@ -9,7 +9,15 @@ from tqdm import tqdm
 import time
 from tvDatafeed import TvDatafeed
 import pytz
+'''
+df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
+lis = ""
 
+text_file = open(r"C:/Stocks/full_ticker_list_list.txt", 'w')
+for i in range(len(df)):
+	if('/' not in str(df.iloc[i]['Ticker'])):
+		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
+text_file.close()'''
 
 #print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
 

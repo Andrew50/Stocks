@@ -368,7 +368,7 @@ class Data:
 		setups = Data.get_setups_list()
 		for setup in setups:
 			df = pd.DataFrame()
-			for ident in ['ben_','desktop_','laptop_']:
+			for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
 				try: 
 					df1 = pd.read_feather(f"C:/Stocks/sync/database/{ident}{setup}.feather").dropna()
 					df1['sindex'] = df1.index
@@ -398,6 +398,7 @@ class Data:
 		if isinstance(dt,str):
 			try: dt = datetime.datetime.strptime(dt, '%Y-%m-%d')
 			except: dt = datetime.datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+		print(f"{dt.hour} {dt.minute} {dt}")
 		time = datetime.time(dt.hour,dt.minute,0)
 		dt = datetime.datetime.combine(dt.date(),time)
 		if dt.hour == 0 and dt.minute == 0:
