@@ -198,6 +198,5 @@ class Screener:
 		elif type == 'intraday': return get_intraday(browser)
 
 if __name__ == '__main__':
-	Screener.run(datetime.datetime(2023,8,21,9,15))
 	Screener.run('current')
 	study.run(study,True)
