@@ -25,6 +25,7 @@ class Screener:
 				else:
 					if 'd' in tf or 'w' in tf: 
 						ticker_list, browser = Screener.get('current',True,browser)
+						#ticker_list = ticker_list[:100]
 						path = 1
 					else: 
 						ticker_list, browser = Screener.get('intraday',True,browser)
@@ -51,9 +52,8 @@ class Screener:
 			model_list = [[st,data.load_model(st)] for st in data.get_config('Screener active_setup_list').split(',') if tf in st]
 			x = np.concatenate([bar.get()[0] for bar in values])
 			info = np.concatenate([bar.get()[2] for bar in values])
-			dfs = []
-			for bar in values:
-				for df in bar.get()[3]: dfs.append(df)
+			dfs = {}
+			for bar in values: dfs.update(bar.get()[3])
 			for st, model in model_list:
 				setups = data.score(x,info,dfs,st,model)
 				for ticker,dt,score,df in setups:
@@ -82,7 +82,7 @@ class Screener:
 		def start_firefox():
 			options = webdriver.FirefoxOptions()
 			options.binary_location = r"C:\Program Files\Mozilla Firefox\firefox.exe"
-			options.headless = False
+			options.headless = True
 			service = Service(executable_path=os.path.join(os.getcwd(), 'Drivers', 'geckodriver.exe'))
 			FireFoxProfile = webdriver.FirefoxProfile()
 			FireFoxProfile.set_preference("General.useragent.override", 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:87.0) Gecko/20100101 Firefox/87.0')
@@ -149,7 +149,9 @@ class Screener:
 				time.sleep(0.25)
 				browser.find_element(By.XPATH, '//div[@data-field="relative_volume_intraday.5"]').click()
 				browser.find_element(By.XPATH, '//div[@data-name="screener-export-data"]').click()
-			except Exception as e: print('manual csv fetch required ' + str(e))
+			except Exception as e: 
+				print(e)
+				print('manual csv fetch required')
 			found = False
 			today = str(datetime.date.today())
 			while True:
@@ -196,5 +198,6 @@ class Screener:
 		elif type == 'intraday': return get_intraday(browser)
 
 if __name__ == '__main__':
+	Screener.run(datetime.datetime(2023,8,21,9,15))
 	Screener.run('current')
-	#study.run(study,True)
+	study.run(study,True)
