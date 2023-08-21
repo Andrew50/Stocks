@@ -21,12 +21,16 @@ text_file.close()'''
 
 #print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
 
-path = "C:/Stocks/local/data/d_2/"
+
+path = "C:/Stocks/local/data/1min_2/"
 path2 = "C:/Stocks/local/data/god/"
 dir_list = os.listdir(path)
 pbar = tqdm(total = len(dir_list))
 for p in dir_list:
-	df = pd.read_csv(path+p)
+	try:
+		df = pd.read_csv(path+p)
+	except:
+		df = pd.read_feather(path+p)
 	#df = df.set_index('datetime',drop = True)
 	df['datetime'] = pd.to_datetime(df['datetime'])
 	df.to_feather(path2+(p.split('.')[0]) + '.feather')
