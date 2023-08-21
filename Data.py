@@ -60,11 +60,13 @@ class Data:
 				bar = info[i]
 				ticker = bar[0]
 				dt = bar[1]
-				key = bar[2]
-				df = dfs[key]
-				try: df = df[:Data.findex(df,dt) + 1]
-				except: pass
-				else:
+				#key = bar[2]
+				#df = dfs[key]
+				try: 
+					df = dfs[ticker]
+					df = df[:Data.findex(df,dt) + 1]
+				except Exception as e: print(e)
+				else: 
 					if Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
 		return setups
 
@@ -75,8 +77,9 @@ class Data:
 			x_reshaped = np.zeros((x.shape[0], FEAT_LENGTH, num_feats))
 			for n in range(0, num_feats): x_reshaped[:, :, n] = x[:, n*FEAT_LENGTH:(n+1)*FEAT_LENGTH]
 			return x_reshaped
-
-		arglist = [[dfs[i],use_whole_df] for i in range(len(dfs))]
+		lis = list(dfs.values())
+		arglist = [[lis[i],use_whole_df] for i in range(len(lis))]
+		#arglist = [[dfs[i],use_whole_df] for i in range(len(dfs))]
 		if current_process().name == 'MainProcess': dfs = Data.pool(Data.worker,arglist)
 		else:
 			dfs = []
@@ -86,9 +89,12 @@ class Data:
 				pbar.update(1)
 			pbar.close()
 		values = pd.concat(dfs).values
-		y = values[:,-4]
-		info = values[:,-3:]
-		x_values = values[:,:-4]
+		y = values[:,-3]
+		#y = values[:,-4]
+		#info = values[:,-3:]
+		info = values[:,-2:]
+		#x_values = values[:,:-4]
+		x_values = values[:,:-3]
 		x = reshape_x(x_values,100)
 		return np.asarray(x).astype(np.float32), np.asarray(y).astype(np.float32), info
 		
@@ -97,11 +103,11 @@ class Data:
 		def time_series(df: pd.DataFrame,col: str,name: str, sample_size) -> pd.DataFrame: 
 			return df.assign(**{f'{name}_t-{lag}': col.shift(lag) for lag in range(0, sample_size)})
 
-		def get_classification(df: pd.DataFrame,value,ticker,dt,key) -> pd.DataFrame:
+		def get_classification(df: pd.DataFrame,value,ticker,dt):#,key) -> pd.DataFrame:
 			df['classification'] = value
 			df['ticker'] = ticker
 			df['dt'] = dt
-			df['key'] = key
+			#df['key'] = key
 			return df
 
 		def get_lagged_returns(df: pd.DataFrame, sample_size) -> pd.DataFrame:
@@ -115,7 +121,7 @@ class Data:
 		try: value = df['value'][0]
 		except: value = 0
 		use_whole_df = bar[1]
-		key = df['key'][0]
+		#key = df['key'][0]
 		sample_size = 100
 		if use_whole_df:
 			add = pd.DataFrame(df.iat[-1,3], index = np.arange(sample_size), columns = df.columns)
@@ -128,8 +134,8 @@ class Data:
 		dt = df.index
 		df = get_lagged_returns(df, sample_size)
 		for col in ['high','low','close']: df[f'feat_{col}_ret_t-{sample_size - 1}'] = df[f'feat_open_ret_t-{sample_size-1}']
-		df = get_classification(df,value, ticker, dt, key)
-		return df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification'] + ['ticker'] + ['dt'] + ['key']]
+		df = get_classification(df,value, ticker, dt)#, key)
+		return df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification'] + ['ticker'] + ['dt']]# + ['key']]
 
 	def train(st, percent_yes, epochs):
 		if len(pd.read_feather('C:/Stocks/local/data/' + st + '.feather')) < 100: return
@@ -179,7 +185,8 @@ class Data:
 
 	def create_arrays(df):
 		pbar = tqdm(total = len(df))
-		dfs = []
+		dfs = {}
+		#dfs = []
 		for i in range(len(df)):
 			bar = df.iloc[i]
 			ticker = bar['ticker']
@@ -190,8 +197,9 @@ class Data:
 			data = Data.get(ticker,tf,dt)
 			if not data.empty: 
 				data['value'] = value
-				data['key'] = df.index[i]
-				dfs.append(data)
+				#data['key'] = df.index[i]
+				dfs.update({data['ticker'][0]:data})
+				#dfs.append(data)
 			pbar.update(1)
 		pbar.close()
 		x, y, info = Data.format(dfs,(dt == None))
@@ -227,7 +235,7 @@ class Data:
 		#current_day = Data.format_date(yf.download(tickers = 'QQQ', period = '25y', group_by='ticker', interval = '1d', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
 		#current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
 		from Screener import Screener as screener
-		scan = screener.get('full',True)[:2]
+		scan = screener.get('full',True)
 		batches = []
 		#for i in range(len(scan)):
 		#   ticker = scan[i]

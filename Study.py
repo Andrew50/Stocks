@@ -178,7 +178,7 @@ class Study:
                 try: 
                     image = PIL.Image.open(f'C:\Stocks\local\study\charts\{i}{self.i}.png')
                     bio = io.BytesIO()
-                    image.save(bio, format="PNG")
+                    image.save(bio,format="PNG")
                     self.window[f'-chart{i}-'].update(data = bio.getvalue())
                     break
                 except (PIL.UnidentifiedImageError, FileNotFoundError, OSError): pass
