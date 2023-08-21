@@ -846,7 +846,8 @@ class Plot:
 				if os.path.exists(p): return
 			else: p = 'C:/Stocks/local/account/trait.png'
 			tf = tflist[ii]
-			df1 = data.get(ticker,tf,dt,100,50)
+			if tf == 'd': df1 = data.get(ticker,tf,dt,110,30)
+			else: df1 = data.get(ticker,tf,dt,110,70)
 			if df1.empty: 
 				shutil.copy(r"C:\Stocks\sync\files\blank.png",p)
 				continue

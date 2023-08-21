@@ -398,7 +398,6 @@ class Data:
 		if isinstance(dt,str):
 			try: dt = datetime.datetime.strptime(dt, '%Y-%m-%d')
 			except: dt = datetime.datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
-		print(f"{dt.hour} {dt.minute} {dt}")
 		time = datetime.time(dt.hour,dt.minute,0)
 		dt = datetime.datetime.combine(dt.date(),time)
 		if dt.hour == 0 and dt.minute == 0:
