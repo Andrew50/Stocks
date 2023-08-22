@@ -19,19 +19,26 @@ for i in range(len(df)):
 		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
 text_file.close()'''
 
-#print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
+data.refill_backtest()
 
-path = "C:/Stocks/local/data/d_2/"
-path2 = "C:/Stocks/local/data/god/"
-dir_list = os.listdir(path)
-pbar = tqdm(total = len(dir_list))
-for p in dir_list:
-	df = pd.read_csv(path+p)
-	#df = df.set_index('datetime',drop = True)
-	df['datetime'] = pd.to_datetime(df['datetime'])
-	df.to_feather(path2+(p.split('.')[0]) + '.feather')
-	pbar.update(1)
-pbar.close()
+
+#print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
+#path = 'C:/Stocks/local/study/historical_setups.feather'
+
+#df = pd.read_feather(path)
+#df = df[df['pre_annotation'] != ''].reset_index(drop = True)
+#df.to_feather(path)
+#path = "C:/Stocks/local/data/d_2/"
+#path2 = "C:/Stocks/local/data/god/"
+#dir_list = os.listdir(path)
+#pbar = tqdm(total = len(dir_list))
+#for p in dir_list:
+#	df = pd.read_csv(path+p)
+#	#df = df.set_index('datetime',drop = True)
+#	df['datetime'] = pd.to_datetime(df['datetime'])
+#	df.to_feather(path2+(p.split('.')[0]) + '.feather')
+#	pbar.update(1)
+#pbar.close()
 	
 
 			

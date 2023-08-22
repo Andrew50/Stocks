@@ -131,7 +131,7 @@ class Study:
         first_minute_volume = 0
         s = mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r'))
         for tf in tf_list:
-            p = pathlib.Path("C:/Stocks/local/study/charts") / f'{ii}{i}.png'
+            p = pathlib.Path("C:/Stocks/local/study/charts") / f'{ii}_{i}.png'
             try:
                 chart_size = 100
                 if 'min' in tf: chart_offset = chart_size - 1
@@ -176,7 +176,7 @@ class Study:
         for i in range(1,5):
             while True:
                 try: 
-                    image = PIL.Image.open(f'C:\Stocks\local\study\charts\{i}{self.i}.png')
+                    image = PIL.Image.open(f'C:\Stocks\local\study\charts\{i}_{self.i}.png')
                     bio = io.BytesIO()
                     image.save(bio,format="PNG")
                     self.window[f'-chart{i}-'].update(data = bio.getvalue())
