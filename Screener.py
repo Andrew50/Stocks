@@ -100,7 +100,7 @@ class Screener:
 			time.sleep(0.5)
 			browser.find_element(By.XPATH, '//input[@name="id_password"]').send_keys("tltShort!1")
 			time.sleep(0.5)
-			browser.find_element(By.XPATH, '//button[@class="submitButton-LQwxK8Bm button-D4RPB3ZC size-large-D4RPB3ZC color-brand-D4RPB3ZC variant-primary-D4RPB3ZC stretch-D4RPB3ZC"]').click()
+			browser.find_element(By.XPATH, '//button[@class="submitButton-LQwxK8Bm button-D4RPB3ZC size-large-D4RPB3ZC color-brand-D4RPB3ZC variant-primary-D4RPB3ZC stretch-D4RPB3ZC apply-overflow-tooltip apply-overflow-tooltip--check-children-recursively apply-overflow-tooltip--allow-text"]').click()
 			time.sleep(3)
 			browser.refresh()
 			time.sleep(5)
@@ -198,5 +198,5 @@ class Screener:
 		elif type == 'intraday': return get_intraday(browser)
 
 if __name__ == '__main__':
-	Screener.run('current')
+	Screener.run(datetime.datetime(2023, 8, 21, 9, 15, 00))
 	study.run(study,True)
