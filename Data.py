@@ -195,7 +195,6 @@ class Data:
 			try: value = bar['value']
 			except: value = 0
 			data = Data.get(ticker,tf,dt)
-			print(data)
 			if not data.empty: 
 				data['value'] = value
 				#data['key'] = df.index[i]
