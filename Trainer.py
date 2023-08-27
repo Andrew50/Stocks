@@ -80,7 +80,7 @@ class Trainer:
 			st.split('_')[1]
 			if self.current_menu == 'Manual': data.add_setup(ticker,dt,st,1,0)
 			else:
-				x,_,_ = data.format([data.get(ticker,st.split('_')[0],dt)])
+				x,_,_,_ = data.create_arrays(pd.DataFrame({'ticker':[ticker],'dt':[dt],'tf':[st.split('_')[0]]}))
 				self.window['-score-'].update(f'{round(100 * data.load_model(st).predict(x)[:,1][0])}% confident')
 		except Exception as e: sg.Popup(e)
 

@@ -1,6 +1,6 @@
 -Data
-	identity = laptop
-	cpu_cores = 8
+	identity =
+	cpu_cores = 5
 	data_drive_letter = C
 -Screener
 	active_setup_list = d_EP,d_NEP,d_P,d_NP,d_F,d_NF,d_MR
@@ -17,8 +17,8 @@
 	1min_VF = .03,0,inf
 -Study 
 	ui_scale = 2.5
-	chart_size = .49
-	chart_aspect_ratio = 2
+	chart_size = .58
+	chart_aspect_ratio = 1.92
 	chart_dpi = 330
 -Trainer
 	ui_scale = 3.3
