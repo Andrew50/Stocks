@@ -44,7 +44,7 @@ class Data:
 			if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
 			if base_tf == '1d' and Data.is_pre_market(dt): 
 				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
-				pm_price = pm_bar['pm change'] +  df.iat[-1,3]
+				pm_price = pm_bar['pm change'] + df.iat[-1,3]
 				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
 			df['ticker'] = ticker
 			return df.dropna()[-bars:]

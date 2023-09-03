@@ -23,7 +23,6 @@ class Study:
             self.filter(self)
             while True:
                 self.event, self.values = self.window.read()
-                
                 if self.event in ['Yes','No']:
                     if self.event == 'Yes': v = 1
                     else: v = 0
@@ -168,9 +167,12 @@ class Study:
             sg.theme('DarkGrey')
             layout = [[sg.Image(key = '-chart1-'),sg.Image(key = '-chart2-')],
             [sg.Image(key = '-chart3-'),sg.Image(key = '-chart4-')],
-            [(sg.Text( key = '-counter-'))]]
+            [(sg.Text(key = '-counter-'))]]
             if self.current: layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
-            else: layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],[sg.Combo([],key = '-sub_st-', size = (20,10))],[sg.Button('Prev'), sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_filter-')]]
+            else: 
+                df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+                self.annotated = len(df[df['pre_annotation'].str.contains(' ')])
+                layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],[sg.Combo([],key = '-sub_st-', size = (20,10))],[sg.Button('Prev'), sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_filter-'),sg.Text(key='annotated')]]
             self.window = sg.Window('Study', layout,margins = (10,10),scaling = data.get_config('Study ui_scale'),finalize = True)
             self.init = False
         for i in range(1,5):
@@ -198,7 +200,10 @@ class Study:
                 self.setups_data.at[index,'sub_st'] = sub_st
                 df.at[index,'sub_st'] = sub_st
                 df.to_feather(r"C:\Stocks\local\study\historical_setups.feather")
-            if int(self.i) == self.i: col = 'pre_annotation'
+            if int(self.i) == self.i: 
+                self.annotated += 1
+                self.window['annotated'].update(str(self.annotated))
+                col = 'pre_annotation'
             else: col = 'post_annotation'
             bar = self.setups_data.iloc[math.floor(self.i)]
             self.window["-annotation-"].update(bar[col])
