@@ -244,7 +244,7 @@ class Data:
 		for i in range(len(scan)):
 			for tf in ['d','1min']: batches.append([scan[i],tf])
 		Data.pool(Data.update, batches)
-		if Data.get_config("Data identity") == 'desktop':
+		if Data.get_config("Data identity") == 'laptop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
 			elif weekday == 5:
@@ -353,10 +353,10 @@ class Data:
 
 	def backup():
 		date = datetime.date.today()
-		src = r'C:/Scan'
-		dst = r'D:/Backups/' + str(date)
+		src = r'C:/Stocks'
+		dst = r'C:/Backups/' + str(date)
 		shutil.copytree(src, dst)
-		path = "D:/Backups/"
+		path = "C:/Backups/"
 		dir_list = os.listdir(path)
 		for b in dir_list:
 			dt = datetime.datetime.strptime(b, '%Y-%m-%d')
