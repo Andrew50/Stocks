@@ -171,7 +171,7 @@ class Study:
             if self.current: layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
             else: 
                 df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
-                self.annotated = len(df[df['pre_annotation'].str.contains(' ')])
+                self.annotated = len(df[df['pre_annotation'] != ''])
                 layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],[sg.Combo([],key = '-sub_st-', size = (20,10))],[sg.Button('Prev'), sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_filter-'),sg.Text(key='annotated')]]
             self.window = sg.Window('Study', layout,margins = (10,10),scaling = data.get_config('Study ui_scale'),finalize = True)
             self.init = False
