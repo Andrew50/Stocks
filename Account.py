@@ -911,7 +911,7 @@ class Plot:
 				newdf = (df2.pivot(index='Datetime', columns='TradeDate_count', values="Price").rename(columns="price{}".format).rename_axis(columns=None))
 				series = mainindidf.merge(newdf, how='left', left_index=True, right_index=True)[newdf.columns]
 				if series.isnull().values.all(axis=0)[0]:pass
-				else: apds.append(mpf.make_addplot(series,type='scatter',markersize=300,alpha = .4,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
+				else: apds.append(mpf.make_addplot(series,type='scatter',markersize=200,alpha = .3,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
 			if tf != '1min': mav = (10,20,50)
 			else: mav = ()
 			mc = mpf.make_marketcolors(up='g',down='r')
