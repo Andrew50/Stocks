@@ -247,10 +247,12 @@ class Traits:
 			rolling_traits_header = ['date  ','gain','loss','win ','max','m time','miss','risk','size','# ','% a ']
 			biggest_trades_header = ['# ','tick','date    ','% a ']
 			setup_traits_header = ['setup'] + rolling_traits_header[1:]
+			weekday_traits_header = ['weekday'] + rolling_traits_header[1:]
 			c1 = [[sg.Table([],headings=biggest_trades_header,key = '-table_winners-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
 			c2 = [[sg.Table([],headings=biggest_trades_header,key = '-table_losers-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
 			c3 = [[sg.Table([],headings=setup_traits_header,key = '-table_setups-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
 			c4 = [[sg.Table([],headings=rolling_traits_header,key = '-table_rolling_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
+			c45 = [[sg.Table([],headings=weekday_traits_header,key = '-table_weekday_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
 			c5 = [[sg.Table([],headings=['Sell %','r $'],key = '-table_sell_percent_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
 			c6 = [[sg.Table([],headings=['Sell a','r $'],key = '-table_sell_account_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
 			c7 = [[sg.Table([],headings=['Stop %','r $'],key = '-table_stop_percent_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
@@ -258,7 +260,7 @@ class Traits:
 			c9 = [[sg.Input(key = '-input_trait-')],[sg.Button('Load')]]
 			c10 = [[sg.Button('Recalc')], [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
 			c11 = [[sg.Image(key = '-CHART-')]]
-			layout = [[sg.Column(c1), sg.VSeperator(), sg.Column(c2), sg.VSeperator(), sg.Column(c3), sg.VSeperator(), sg.Column(c4), sg.VSeperator(),sg.Column(c5), sg.VSeperator(),sg.Column(c6),  sg.VSeperator(), sg.Column(c7),  sg.VSeperator(), sg.Column(c8),  sg.VSeperator(), sg.Column(c9)],[sg.Column(c10),sg.VSeperator(),sg.Column(c11),]]
+			layout = [[sg.Column(c1), sg.VSeperator(), sg.Column(c2), sg.VSeperator(), sg.Column(c3), sg.VSeperator(), sg.Column(c4), sg.VSeperator(),sg.Column(c45), sg.VSeperator(),sg.Column(c5), sg.VSeperator(),sg.Column(c6),  sg.VSeperator(), sg.Column(c7),  sg.VSeperator(), sg.Column(c8),  sg.VSeperator(), sg.Column(c9)],[sg.Column(c10),sg.VSeperator(),sg.Column(c11),]]
 			self.window = sg.Window('Traits', layout,margins = (10,10),scaling=data.get_config('Traits ui'),finalize = True)
 			self.window.maximize()
 		sell_percent_table, sell_account_table, stop_percent_table, stop_account_table = Traits.build_optimal_traits_table(self)
@@ -266,6 +268,7 @@ class Traits:
 		self.window['-table_losers-'].update(Traits.build_trades_table(self,False))
 		self.window['-table_setups-'].update(Traits.build_setup_traits_table(self))
 		self.window['-table_rolling_traits-'].update(Traits.build_rolling_traits_table(self))
+		self.window['-table_weekday_traits-'].update(Traits.build_weekday_traits_table(self))
 		self.window['-table_sell_percent_traits-'].update(sell_percent_table)
 		self.window['-table_sell_account_traits-'].update(sell_account_table)
 		self.window['-table_stop_percent_traits-'].update(stop_percent_table)
@@ -326,6 +329,14 @@ class Traits:
 		pnl -= 1
 		trades = len(df)
 		return [title,round(avg_gain,2), round(avg_loss,2), round(win,2),round(high,2), max_time, round(miss,2), round(risk,2), round(size,2), round(trades,2), round(pnl,2)]
+
+	def build_weekday_traits_table(self):
+		df = self.df_traits.copy()
+		df['datetime'] = df['datetime'].dt.day_name()
+		groups = df.groupby(pd.Grouper(key='datetime'))
+		dfs = [group for _,group in groups]
+		return [Traits.calc_trait_values(df,df.iloc[0]['datetime']) for df in dfs]
+
 
 	def build_rolling_traits_table(self):
 		groups = self.df_traits.groupby(pd.Grouper(key='datetime', freq='3M'))
