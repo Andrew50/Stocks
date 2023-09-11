@@ -370,7 +370,6 @@ class Data:
 		try: df = pd.read_feather(path)
 		except FileNotFoundError: df = pd.DataFrame()
 		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','dt'],keep = 'last').reset_index(drop = True)
-		print(df)
 		df.to_feather(path)
 
 	def consolidate_database(): 
