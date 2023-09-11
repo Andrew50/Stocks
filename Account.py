@@ -47,7 +47,7 @@ class Run:
 					self.queued_recalcs = pd.DataFrame()
 					try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
 					except FileNotFoundError: pass
-				except Exception as e: print(e)
+				except TimeoutError as e: print(e)
 		self.menu = self.event
 		self.init = True
 		try: self.window.close()
@@ -646,6 +646,7 @@ class Account:
 				if ticker != '':
 					shares = float(open_shares_list[i])
 					df = data.get(ticker,'1min',datetime.datetime.now())########needs to be fixed ebcause if df doesnt exist then it has to set df to price of aevrage which has to be calced zzzzzzzzzzzz
+					if df.empty: df = 0
 					pos.append([ticker,shares,df])
 			pnl = bar['open']
 			deposits = bar['deposits']
@@ -683,6 +684,7 @@ class Account:
 						pos_index = len(pos)
 						try:
 							df = data.get(ticker,'1min')
+							if df.empty: raise IndexError
 							data.findex(df,date) + 1
 						except IndexError: 
 							df = price
@@ -707,8 +709,12 @@ class Account:
 				shares = pos[i][1]
 				df = pos[i][2]
 				if isinstance(df, pd.DataFrame):
-					index = data.findex(df,date)
-					prev_index = data.findex(df,prev_date)
+					try:
+						index = data.findex(df,date)
+						prev_index = data.findex(df,prev_date)
+					except:
+						print(df)
+						print(date)
 					prevc = df.iat[prev_index,3]
 					c = df.iat[index,3] 
 					o = df.iat[index,0]

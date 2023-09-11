@@ -251,7 +251,7 @@ class Data:
 				Data.consolidate_database()
 				setup_list = Data.get_setups_list()
 				for s in setup_list: Data.train(s,.05,200)
-		else: Data.refill_backtest()
+		Data.refill_backtest()
 
 	def update(bar):
 		ticker = bar[0]
@@ -370,6 +370,7 @@ class Data:
 		try: df = pd.read_feather(path)
 		except FileNotFoundError: df = pd.DataFrame()
 		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','dt'],keep = 'last').reset_index(drop = True)
+		print(df)
 		df.to_feather(path)
 
 	def consolidate_database(): 

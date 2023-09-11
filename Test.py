@@ -41,8 +41,8 @@ data.refill_backtest()
 #pbar.close()
 	
 
-df = pd.read_feather("C:/Stocks/local/study/historical_setups.feather")
-print(df)
+#df = pd.read_feather("C:/Stocks/local/study/historical_setups.feather")
+#rint(df)
 			
 				
 
