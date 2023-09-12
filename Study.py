@@ -128,7 +128,7 @@ class Study:
         first_minute_low = 1
         first_minute_close = 1
         first_minute_volume = 0
-        s = mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r'))
+        s = mpf.make_mpf_style(base_mpf_style= 'nightclouds',marketcolors=mpf.make_marketcolors(up='g',down='r',wick ='inherit',edge='inherit',volume='inherit'))
         for tf in tf_list:
             p = pathlib.Path("C:/Stocks/local/study/charts") / f'{ii}_{i}.png'
             try:
@@ -153,8 +153,11 @@ class Study:
                         df.iat[-1,4] = first_minute_volume
                 if (current or revealed) and ii == 1: title = f'{ticker} {dt} {st} {z} {tf}' 
                 else: title = str(tf)
-                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[dt], alpha = .25))
-                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
+                #if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[dt], alpha = .25))
+                #else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
+                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1),  tight_layout = True,vlines=dict(vlines=[dt], alpha = .25))
+                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1),  tight_layout = True)
+                
                 ax = axlist[0]
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -164,7 +167,7 @@ class Study:
 
     def update(self):
         if self.init:
-            sg.theme('DarkGrey')
+            sg.theme('Black')
             layout = [[sg.Image(key = '-chart1-'),sg.Image(key = '-chart2-')],
             [sg.Image(key = '-chart3-'),sg.Image(key = '-chart4-')],
             [(sg.Text(key = '-counter-'))]]
