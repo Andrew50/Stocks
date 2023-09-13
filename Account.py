@@ -14,7 +14,7 @@ class Run:
 
 	def run(self):
 		with Pool(int(data.get_config('Data cpu_cores'))) as self.pool:
-			sg.theme('DarkGrey')
+			sg.theme('Black')
 			try: self.df_log = pd.read_feather(r"C:\Stocks\local\account\log.feather")
 			except FileNotFoundError: self.df_log = pd.DataFrame()
 			try: self.df_traits = pd.read_feather(r"C:\Stocks\local\account\traits.feather")
@@ -929,10 +929,11 @@ class Plot:
 				series = mainindidf.merge(newdf, how='left', left_index=True, right_index=True)[newdf.columns]
 				if series.isnull().values.all(axis=0)[0]:pass
 				else: apds.append(mpf.make_addplot(series,type='scatter',markersize=100,alpha = .3,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
-			if tf != '1min': mav = (10,20,50)
-			else: mav = ()
-			mc = mpf.make_marketcolors(up='g',down='r')
-			s  = mpf.make_mpf_style(marketcolors=mc)
+			#if tf != '1min': mav = (10,20,50)
+			#else: mav = ()
+			mav = ()
+			mc = mpf.make_marketcolors(up='g',down='r',wick ='inherit',edge='inherit',volume='inherit')
+			s  = mpf.make_mpf_style(base_mpf_style= 'nightclouds',marketcolors=mc)
 			_, axlist = mpf.plot(df1, type='candle', volume=True, title=str(f'{ticker} , {tf}'), style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config(f'{source} chart_aspect_ratio'),1),
 			figscale=data.get_config(f'{source} chart_size'), panel_ratios = (5,1), mav=mav, tight_layout = True,axisoff = True,addplot=apds)
 			ax = axlist[0]

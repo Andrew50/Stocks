@@ -55,10 +55,11 @@ class Study:
                     self.window.close()
 
     def preload(self):
+        preload_amount = 10
         if self.i == 0:
-            if self.current: index_list = [float(i) for i in range(20)]
-            else: index_list = [float(i/2) for i in range(40)]
-        else: index_list = [19 + self.i]
+            if self.current: index_list = [float(i) for i in range(preload_amount)]
+            else: index_list = [float(i/2) for i in range(preload_amount*2)]
+        else: index_list = [preload_amount-1 + self.i]
         arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
         self.pool.map_async(self.plot,arglist)
         
