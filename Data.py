@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Sequential, load_model
 from multiprocessing import Pool, current_process
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
-import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow
+import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
 
 class Data:
@@ -50,8 +50,8 @@ class Data:
 			return df.dropna()[-bars:]
 		except TimeoutError: return pd.DataFrame()
 
-	def score(x,info,dfs,st,model):
-		threshold = Data.get_config('Screener threshold')
+	def score(x,info,dfs,st,model,threshold = None,use_requirements = True):
+		if threshold == None: threshold = Data.get_config('Screener threshold')
 		setups = []
 		scores = model.predict(x)[:,1]
 		for i in range(len(scores)):
@@ -63,24 +63,32 @@ class Data:
 				#key = bar[2]
 				#df = dfs[key]
 				try: 
-					df = dfs[ticker]
+					try: df = dfs[ticker+str(dt)]
+					except: df = dfs[ticker+'None']
+
+					#if dt == None: df = dfs[ticker+str(dt)]
+					#else: df = dfs[ticker+str(dt.date())]
 					df = df[:Data.findex(df,dt) + 1]
-				except Exception as e: print(e)
+				except Exception as e: print(e)##########
 				else: 
-					if Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
+					if threshold == 0 or not use_requirements or Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
+		random.shuffle(setups)
 		return setups
 
 	def format(dfs, use_whole_df = False):
-
 		def reshape_x(x: np.array,FEAT_LENGTH) -> np.array:
 			num_feats = x.shape[1]//FEAT_LENGTH
 			x_reshaped = np.zeros((x.shape[0], FEAT_LENGTH, num_feats))
 			for n in range(0, num_feats): x_reshaped[:, :, n] = x[:, n*FEAT_LENGTH:(n+1)*FEAT_LENGTH]
 			return x_reshaped
 		lis = list(dfs.values())
+		#try: lis = list(dfs.values())#if it is dict try and extract list
+		#except: lis = dfs# otherwise it is already a list as it is passed from trainer tuner
 		arglist = [[lis[i],use_whole_df] for i in range(len(lis))]
 		#arglist = [[dfs[i],use_whole_df] for i in range(len(dfs))]
-		if current_process().name == 'MainProcess': dfs = Data.pool(Data.worker,arglist)
+		if current_process().name == 'MainProcess': 
+			
+			dfs = Data.pool(Data.worker,arglist)
 		else:
 			dfs = []
 			pbar = tqdm(total = len(arglist))
@@ -184,9 +192,11 @@ class Data:
 		return x, y
 
 	def create_arrays(df):
+
 		pbar = tqdm(total = len(df))
 		dfs = {}
 		#dfs = []
+		k = 0
 		for i in range(len(df)):
 			bar = df.iloc[i]
 			ticker = bar['ticker']
@@ -198,8 +208,11 @@ class Data:
 			if not data.empty: 
 				data['value'] = value
 				#data['key'] = df.index[i]
-				dfs.update({data['ticker'][0]:data})
+				if dt == None: dfs.update({data['ticker'][0] + str(dt):data})
+				else: dfs.update({data['ticker'][0] + str(dt):data})
+				#else: dfs.update({data['ticker'][0] + str(dt.date()):data})####
 				#dfs.append(data)
+				k += 1
 			pbar.update(1)
 		pbar.close()
 		x, y, info = Data.format(dfs,(dt == None))
@@ -250,7 +263,7 @@ class Data:
 			elif weekday == 5:
 				Data.consolidate_database()
 				setup_list = Data.get_setups_list()
-				for s in setup_list: Data.train(s,.05,200)
+				for s in setup_list: Data.train(s,.1,200)
 		Data.refill_backtest()
 
 	def update(bar):
@@ -376,7 +389,8 @@ class Data:
 		setups = Data.get_setups_list()
 		for setup in setups:
 			df = pd.DataFrame()
-			for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
+			#for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
+			for ident in ['desktop_','laptop_']:
 				try: 
 					df1 = pd.read_feather(f"C:/Stocks/sync/database/{ident}{setup}.feather").dropna()
 					df1['sindex'] = df1.index

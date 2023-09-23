@@ -1,3 +1,4 @@
+from inspect import Attribute
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -47,7 +48,7 @@ class Run:
 					self.queued_recalcs = pd.DataFrame()
 					try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
 					except FileNotFoundError: pass
-				except TimeoutError as e: print(e)
+				except Exception as e: sg.Popup(str('While recaculating:    ') + str(e))
 		self.menu = self.event
 		self.init = True
 		try: self.window.close()
@@ -217,9 +218,11 @@ class Traits:
 		elif (self.event == '-table_losers-' or self.event == '-table_winners-') and len(self.values[self.event]) > 0:
 			sorted_df = self.df_traits.sort_values('pnl a', ascending = (self.event == '-table_winners-')).reset_index(drop = True)
 			Plot.create([self.values[self.event][0],sorted_df,True])
-		elif '+CLICKED+' in self.event and self.event[2][1] != 0:
+		elif '+CLICKED+' in self.event:
 			table = self.window[self.event[0]].Values
-			y = [b[self.event[2][1]] for b in table]
+			god = self.event[2][1]
+			if god == 0: god = 1
+			y = [b[god] for b in table]
 			x = [b[0] for b in table]
 			plt.clf()
 			plt.scatter(x,y,s = data.get_config('Traits marker_size'))
@@ -244,28 +247,26 @@ class Traits:
 	def update(self):
 		if self.init:
 			self.init = False
-			rolling_traits_header = ['date  ','gain','loss','win ','max','m time','miss','risk','size','# ','% a ']
-			biggest_trades_header = ['# ','tick','date    ','% a ']
+			rolling_traits_header = ['date  ','gain','loss','win  ','max ','m time','miss','risk','size ','#  ','% a  ']
+			biggest_trades_header = ['# ','tick','% a ']
 			setup_traits_header = ['setup'] + rolling_traits_header[1:]
 			weekday_traits_header = ['weekday'] + rolling_traits_header[1:]
-			c1 = [[sg.Table([],headings=biggest_trades_header,key = '-table_winners-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
-			c2 = [[sg.Table([],headings=biggest_trades_header,key = '-table_losers-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
-			c3 = [[sg.Table([],headings=setup_traits_header,key = '-table_setups-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c4 = [[sg.Table([],headings=rolling_traits_header,key = '-table_rolling_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c45 = [[sg.Table([],headings=weekday_traits_header,key = '-table_weekday_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c5 = [[sg.Table([],headings=['Sell %','r $'],key = '-table_sell_percent_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c6 = [[sg.Table([],headings=['Sell a','r $'],key = '-table_sell_account_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c7 = [[sg.Table([],headings=['Stop %','r $'],key = '-table_stop_percent_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c8 = [[sg.Table([],headings=['Stop a','r $'],key = '-table_stop_account_traits-',auto_size_columns=True,num_rows = 15,justification='left',enable_events=True,enable_click_events=True)]]
-			c9 = [[sg.Input(key = '-input_trait-')],[sg.Button('Load')]]
-			c10 = [[sg.Button('Recalc')], [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
+			c1 = [[sg.Table([],headings=biggest_trades_header,key = '-table_winners-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,selected_row_colors='red on yellow')]]
+			c3 = [[sg.Table([],headings=setup_traits_header,key = '-table_setups-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c4 = [[sg.Table([],headings=rolling_traits_header,key = '-table_rolling_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c45 = [[sg.Table([],headings=weekday_traits_header,key = '-table_weekday_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c5 = [[sg.Table([],headings=['S%','$'],key = '-table_sell_percent_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c6 = [[sg.Table([],headings=['Sa','$'],key = '-table_sell_account_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c7 = [[sg.Table([],headings=['S%','$'],key = '-table_stop_percent_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c8 = [[sg.Table([],headings=['Sa','$'],key = '-table_stop_account_traits-',auto_size_columns=True,num_rows = 10,justification='left',enable_events=True,enable_click_events=True)]]
+			c9 = []
+			c10 = [[sg.Button('Recalc'),sg.Button('Load'),sg.Input(key = '-input_trait-',size = 10)], [sg.Button('Account'), sg.Button('Log'),sg.Button('Traits'),sg.Button('Plot')]]
 			c11 = [[sg.Image(key = '-CHART-')]]
-			layout = [[sg.Column(c1), sg.VSeperator(), sg.Column(c2), sg.VSeperator(), sg.Column(c3), sg.VSeperator(), sg.Column(c4), sg.VSeperator(),sg.Column(c45), sg.VSeperator(),sg.Column(c5), sg.VSeperator(),sg.Column(c6),  sg.VSeperator(), sg.Column(c7),  sg.VSeperator(), sg.Column(c8),  sg.VSeperator(), sg.Column(c9)],[sg.Column(c10),sg.VSeperator(),sg.Column(c11),]]
+			layout = [[sg.Column(c1), sg.VSeperator(),  sg.Column(c3), sg.VSeperator(), sg.Column(c4), sg.VSeperator(),sg.Column(c45), sg.VSeperator(),sg.Column(c5), sg.VSeperator(),sg.Column(c6),  sg.VSeperator(), sg.Column(c7),  sg.VSeperator(), sg.Column(c8),  sg.VSeperator(), sg.Column(c9)],[sg.Column(c10),sg.VSeperator(),sg.Column(c11),]]
 			self.window = sg.Window('Traits', layout,margins = (10,10),scaling=data.get_config('Traits ui'),finalize = True)
 			self.window.maximize()
 		sell_percent_table, sell_account_table, stop_percent_table, stop_account_table = Traits.build_optimal_traits_table(self)
-		self.window['-table_winners-'].update(Traits.build_trades_table(self,True))
-		self.window['-table_losers-'].update(Traits.build_trades_table(self,False))
+		self.window['-table_winners-'].update(Traits.build_trades_table(self))
 		self.window['-table_setups-'].update(Traits.build_setup_traits_table(self))
 		self.window['-table_rolling_traits-'].update(Traits.build_rolling_traits_table(self))
 		self.window['-table_weekday_traits-'].update(Traits.build_weekday_traits_table(self))
@@ -323,12 +324,16 @@ class Traits:
 		miss = df['miss %'].mean()
 		risk = df[df['risk %'] > 0]['risk %'].mean()
 		size = df[df['size %'] > 0]['size %'].mean()
-		pnl_list = ((df['pnl a'] / 100) + 1).tolist()
+		pnl_list = df['pnl a'].tolist()
 		pnl = 1
-		for trade in pnl_list: pnl *= trade
+		print(pnl_list)
+		for trade in pnl_list: pnl *= trade/100 + 1
+
+		print(pnl)
 		pnl -= 1
+		pnl*= 100
 		trades = len(df)
-		return [title,round(avg_gain,2), round(avg_loss,2), round(win,2),round(high,2), max_time, round(miss,2), round(risk,2), round(size,2), round(trades,2), round(pnl,2)]
+		return [title,round(avg_gain,1), round(avg_loss,1), round(win),round(high,1), round(max_time,1), round(miss,1), round(risk,2), round(size), round(trades,0), round(pnl,1)]
 
 	def build_weekday_traits_table(self):
 		df = self.df_traits.copy()
@@ -342,7 +347,8 @@ class Traits:
 		groups = self.df_traits.groupby(pd.Grouper(key='datetime', freq='3M'))
 		dfs = [group for _,group in groups]
 		rolling_traits = [Traits.calc_trait_values(self.df_traits,'Overall')]
-		for df in dfs: rolling_traits.append(Traits.calc_trait_values(df,str(df.iat[0,1])[:-12]))
+	
+		for df in dfs: rolling_traits.append(Traits.calc_trait_values(df,str(df.iat[0,0])[:-12]))
 		return rolling_traits
 
 	def build_setup_traits_table(self):
@@ -350,14 +356,52 @@ class Traits:
 		dfs = [group for _,group in groups]
 		return [Traits.calc_trait_values(df,df.iloc[0]['setup']) for df in dfs]
 		
-	def build_trades_table(self, winners):
-		sorted_df = self.df_traits.sort_values('pnl a', ascending = winners).reset_index(drop = True)
+	def build_trades_table(self):
+		sorted_df = self.df_traits.sort_values('pnl a', ascending = False).reset_index(drop = True)
 		df = pd.DataFrame()
 		df['#'] = sorted_df.index + 1
 		df['Ticker'] = sorted_df['ticker']
-		df['Date'] = sorted_df['datetime']
 		df['% a'] = sorted_df['pnl a'].round(2)
 		return df.values.tolist()
+
+
+	def estimate_setups(df_traits):
+
+		sort = df_traits[df_traits['setup'] == '']
+		if not sort.empty:
+
+			df_traits['score'] = -1
+
+			df_traits = df_traits.set_index('datetime')
+
+			tf = 'd'
+
+			df = pd.DataFrame()
+			df['ticker'] = sort['ticker']
+			df['dt'] = sort['datetime']
+			df['tf'] = tf
+			x,t,info,dfs = data.create_arrays(df)
+			model_list = [[st,data.load_model(st)] for st in data.get_config('Screener active_setup_list').split(',') if tf in st]
+			for st, model in model_list:
+
+				setups = data.score(x,info,dfs,st,model,0)
+				for ticker,dt,score,_ in setups: 
+					
+					
+					try: index = data.findex(df_traits,dt)
+					except:
+						index = 0
+					while ticker != df_traits.iloc[index][0]: index += 1
+
+					if score > df_traits.iloc[index]['score']:
+						df_traits.iat[index,24] = score
+						df_traits.iat[index,2] = st
+				
+
+		df_traits = df_traits.drop(columns = 'score')
+		df_traits = df_traits.reset_index()
+		return df_traits
+
 
 	def calc(self,changed_logs = pd.DataFrame()):
 		if changed_logs.empty: changed_logs = self.queued_recalcs
@@ -370,7 +414,12 @@ class Traits:
 		arglist = [[trades.iloc[i], self.df_pnl] for i in range(len(trades))]
 		new_traits = pd.concat(data.pool(Traits.calc_traits,arglist))
 		self.df_traits = pd.concat([self.df_traits,new_traits]).sort_values(by = 'datetime',ascending = True).reset_index(drop = True)
+		self.df_traits = Traits.estimate_setups(self.df_traits.copy())
 		self.df_traits.to_feather(r'C:\Stocks\local\account\traits.feather')
+
+
+
+
 
 	def calc_trades(df_log):
 		pos = []
@@ -645,7 +694,7 @@ class Account:
 				ticker = open_positions_list[i]
 				if ticker != '':
 					shares = float(open_shares_list[i])
-					df = data.get(ticker,'1min',datetime.datetime.now())########needs to be fixed ebcause if df doesnt exist then it has to set df to price of aevrage which has to be calced zzzzzzzzzzzz
+					df = data.get(ticker,'1min',datetime.datetime.now())#needs to be fixed ebcause if df doesnt exist then it has to set df to price of aevrage which has to be calced zzzzzzzzzzzz
 					if df.empty: df = 0
 					pos.append([ticker,shares,df])
 			pnl = bar['open']
@@ -709,12 +758,8 @@ class Account:
 				shares = pos[i][1]
 				df = pos[i][2]
 				if isinstance(df, pd.DataFrame):
-					try:
-						index = data.findex(df,date)
-						prev_index = data.findex(df,prev_date)
-					except:
-						print(df)
-						print(date)
+					index = data.findex(df,date)
+					prev_index = data.findex(df,prev_date)
 					prevc = df.iat[prev_index,3]
 					c = df.iat[index,3] 
 					o = df.iat[index,0]
@@ -928,14 +973,11 @@ class Plot:
 				newdf = (df2.pivot(index='Datetime', columns='TradeDate_count', values="Price").rename(columns="price{}".format).rename_axis(columns=None))
 				series = mainindidf.merge(newdf, how='left', left_index=True, right_index=True)[newdf.columns]
 				if series.isnull().values.all(axis=0)[0]:pass
-				else: apds.append(mpf.make_addplot(series,type='scatter',markersize=100,alpha = .3,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
-			#if tf != '1min': mav = (10,20,50)
-			#else: mav = ()
-			mav = ()
+				else: apds.append(mpf.make_addplot(series,type='scatter',markersize=50,alpha = .65,marker=datafram.iloc[0]['Marker'],edgecolors='black', color=datafram.iloc[0]['Color']))
 			mc = mpf.make_marketcolors(up='g',down='r',wick ='inherit',edge='inherit',volume='inherit')
 			s  = mpf.make_mpf_style(base_mpf_style= 'nightclouds',marketcolors=mc)
 			_, axlist = mpf.plot(df1, type='candle', volume=True, title=str(f'{ticker} , {tf}'), style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config(f'{source} chart_aspect_ratio'),1),
-			figscale=data.get_config(f'{source} chart_size'), panel_ratios = (5,1), mav=mav, tight_layout = True,axisoff = True,addplot=apds)
+			figscale=data.get_config(f'{source} chart_size'), panel_ratios = (5,1), tight_layout = True,axisoff = True,addplot=apds)
 			ax = axlist[0]
 			ax.set_yscale('log')
 			ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())

@@ -33,7 +33,7 @@ class Study:
                     st = bar['st']
                     data.add_setup(ticker,dt,st,v,1)
                     self.event = 'Next'
-                if self.event == 'Next' and (self.i < len(self.setups_data) - 1 or (self.i < len(self.setups_data) + .5 and not self.current)): 
+                if self.event == 'Next' and (self.i < len(self.setups_data) - 1 or (self.i < len(self.setups_data) - .5 and not self.current)): 
                     self.previ = self.i
                     if self.current: self.i += 1
                     else: self.i += .5
@@ -46,7 +46,7 @@ class Study:
                     else: self.i -= .5
                     self.update(self)
                 elif self.event == 'Load':
-                    self.previ = self.i
+                    self.previ = self.i 
                     self.update(self)
                     self.filter(self)
                 if self.event == sg.WIN_CLOSED:
