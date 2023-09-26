@@ -198,10 +198,11 @@ class Trainer:
 		ii = 0
 		while True:
 			ticker = full_ticker_list[random.randint(0,len(full_ticker_list)-1)]
-			dfs = [data.get(ticker,tf = current_tf)]
-			if dfs[0].empty: continue
-			x,_,info = data.format(dfs,True)
-			setups = data.score(x,info,dfs,st,model,False)
+			x,_,info, dfs = data.create_arrays(pd.DataFrame({'ticker':[ticker],'dt':[None],'tf':[current_tf]}))
+			#dfs ={ticker:data.get(ticker,tf = current_tf)}
+			#if list(dfs.values())[0].empty: continue#zzzzzz theres gotta be a better way to check if the df is empty
+			#x,_,info = data.format(dfs,True)
+			setups = data.score(x,info,dfs,st,model,use_requirements=True)
 			for ticker,_,score,df in setups:
 				index = 300
 				if index >= len(df): index = len(df) - 1
@@ -231,12 +232,12 @@ class Trainer:
 			shutil.copy(r'C:\Stocks\sync\files\blank.png',p)
 						
 	def save_training_data(self):
-		data = self.chart_info[self.i][0]
+		info = self.chart_info[self.i][0]
 		ticker = self.chart_info[self.i][1]
 		ii = 0
 		for s in self.current_setup_list:
 			df = pd.DataFrame()
-			df['dt'] = data.index
+			df['dt'] = info.index
 			df['ticker'] = ticker
 			df['value'] = 0
 			df['required'] = 0
@@ -246,7 +247,7 @@ class Trainer:
 					index = bar[0]
 					df.iat[index,2] = 1
 					if index <= self.trainer_cutoff:
-						add = pd.DataFrame({'ticker':[ticker],'dt':[data.index[index]], 'value':[1], 'required':[0]})
+						add = pd.DataFrame({'ticker':[ticker],'dt':[info.index[index]], 'value':[1], 'required':[0]})
 						df = pd.concat([df,add]).reset_index(drop = True)
 			df = df[self.trainer_cutoff:]
 			if self.event == 'Skip No': df = df[df['value'] == 1]
