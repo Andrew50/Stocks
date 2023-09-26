@@ -41,11 +41,13 @@ class Run:
 			if self.df_pnl.empty: Account.calc(self,self.df_log)
 			if self.df_traits.empty: Traits.calc(self,self.df_log)
 			if not self.queued_recalcs.empty: 
-				Account.calc(self)
-				Traits.calc(self)
-				self.queued_recalcs = pd.DataFrame()
-				try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
-				except FileNotFoundError: pass
+				try:
+					Account.calc(self)
+					Traits.calc(self)
+					self.queued_recalcs = pd.DataFrame()
+					try: os.remove('C:/Stocks/local/account/queued_recalcs.feather')
+					except FileNotFoundError: pass
+				except Exception as e: print(e)
 		self.menu = self.event
 		self.init = True
 		try: self.window.close()
@@ -632,7 +634,7 @@ class Account:
 				ticker = open_positions_list[i]
 				if ticker != '':
 					shares = float(open_shares_list[i])
-					df = data.get(ticker,'1min',datetime.datetime.now())
+					df = data.get(ticker,'1min',datetime.datetime.now())########needs to be fixed ebcause if df doesnt exist then it has to set df to price of aevrage which has to be calced zzzzzzzzzzzz
 					pos.append([ticker,shares,df])
 			pnl = bar['open']
 			deposits = bar['deposits']
