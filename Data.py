@@ -63,9 +63,15 @@ class Data:
 				#key = bar[2]
 				#df = dfs[key]
 				try: 
-					try: df = dfs[ticker+str(dt)]
-					except: df = dfs[ticker+'None']
 
+					df = dfs[ticker]
+
+					#try: df = dfs[ticker+str(dt)]
+					#except: df = dfs[ticker+'god']
+					#except: df = dfs[ticker+'god']#
+
+
+					#df = dfs[ticker+str(dt)]
 					#if dt == None: df = dfs[ticker+str(dt)]
 					#else: df = dfs[ticker+str(dt.date())]
 					df = df[:Data.findex(df,dt) + 1]
@@ -74,6 +80,35 @@ class Data:
 					if threshold == 0 or not use_requirements or Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
 		random.shuffle(setups)
 		return setups
+
+	def create_arrays(df):
+
+		pbar = tqdm(total = len(df))
+		dfs = {}
+		#dfs = []
+		k = 0
+		for i in range(len(df)):
+			bar = df.iloc[i]
+			ticker = bar['ticker']
+			tf = bar['tf']
+			dt = bar['dt']
+			try: value = bar['value']
+			except: value = 0
+			data = Data.get(ticker,tf,dt)
+			if not data.empty: 
+				data['value'] = value
+				#data['key'] = df.index[i]
+				#print(str(dt))
+				#if dt == None: dfs.update({data['ticker'][0] + str('god'):data})
+				#else: dfs.update({data['ticker'][0] + str(dt):data})
+				dfs.update({data['ticker'][0]:data})
+				#else: dfs.update({data['ticker'][0] + str(dt.date()):data})####
+				#dfs.append(data)
+				k += 1
+			pbar.update(1)
+		pbar.close()
+		x, y, info = Data.format(dfs,(dt == None))
+		return x, y, info, dfs
 
 	def format(dfs, use_whole_df = False):
 		def reshape_x(x: np.array,FEAT_LENGTH) -> np.array:
@@ -191,32 +226,7 @@ class Data:
 		y = np.concatenate([bar[1] for bar in values])
 		return x, y
 
-	def create_arrays(df):
-
-		pbar = tqdm(total = len(df))
-		dfs = {}
-		#dfs = []
-		k = 0
-		for i in range(len(df)):
-			bar = df.iloc[i]
-			ticker = bar['ticker']
-			tf = bar['tf']
-			dt = bar['dt']
-			try: value = bar['value']
-			except: value = 0
-			data = Data.get(ticker,tf,dt)
-			if not data.empty: 
-				data['value'] = value
-				#data['key'] = df.index[i]
-				if dt == None: dfs.update({data['ticker'][0] + str(dt):data})
-				else: dfs.update({data['ticker'][0] + str(dt):data})
-				#else: dfs.update({data['ticker'][0] + str(dt.date()):data})####
-				#dfs.append(data)
-				k += 1
-			pbar.update(1)
-		pbar.close()
-		x, y, info = Data.format(dfs,(dt == None))
-		return x, y, info, dfs
+	
 
 	def get_requirements(ticker, df, st):
 

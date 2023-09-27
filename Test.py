@@ -1,14 +1,14 @@
-from Data import Data as data
-import datetime
-from Screener import Screener as screener
-import pandas as pd
-import os
-import yfinance as yf
-from tqdm import tqdm
+#from Data import Data as data
+#import datetime
+#from Screener import Screener as screener
+#import pandas as pd
+#import os
+#import yfinance as yf
+#from tqdm import tqdm
 
-import time
-from tvDatafeed import TvDatafeed
-import pytz
+#import time
+#from tvDatafeed import TvDatafeed
+#import pytz
 '''
 df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
 lis = ""
@@ -19,7 +19,46 @@ for i in range(len(df)):
 		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
 text_file.close()'''
 
-data.refill_backtest()
+
+
+
+class Student:
+
+
+	def __init__(self,name='none'):
+		self.name = name
+
+	def ident(self):
+		print(self.name)
+
+	def set_birthday(self,birthday):
+		self.birthday = birthday
+
+	def read_birthday(self):
+		print(self.birthday)
+
+
+class idk(Student):
+
+
+	#def __init__(self,name='none'):
+		#self.name1 = name
+
+	def ident(self):
+		print('odddd')
+
+	def gosh(self):
+		print (self.name)
+
+#student = Student('dd')
+#student.set_birthday('september')
+#student.read_birthday()
+
+st = idk('d')
+st.gosh()
+st.ident()
+
+#data.refill_backtest()
 
 
 #print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
