@@ -1,14 +1,263 @@
-#from Data import Data as data
-#import datetime
-#from Screener import Screener as screener
-#import pandas as pd
-#import os
-#import yfinance as yf
-#from tqdm import tqdm
+import numpy as np
+import pandas as pd
+import yfinance as yf
+from tqdm import tqdm
+from Data import Data as data
+from pyarrow import feather
+from tvDatafeed import TvDatafeed
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential, load_model
+from multiprocessing import Pool, current_process
+from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
+import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 
-#import time
-#from tvDatafeed import TvDatafeed
-#import pytz
+
+def sample(st,use):
+
+	data.consolidate_database()
+	allsetups = pd.read_feather('C:/Stocks/local/data/' + st + '.feather').sort_values(by='dt', ascending = False).reset_index(drop = True)
+	yes = []
+	no = []
+	groups = allsetups.groupby(pd.Grouper(key='ticker'))
+	dfs = [group for _,group in groups]
+	for df in dfs:
+		df = df.reset_index(drop = True)
+		for i in range(len(df)):
+			bar = df.iloc[i]
+			if bar['value'] == 1:
+				for ii in [i + ii for ii in [-2,-1,1,2]]:
+					if abs(ii) < len(df): 
+						bar2 = df.iloc[ii]
+						if bar2['value'] == 0: no.append(bar2)
+				yes.append(bar)
+	yes = pd.DataFrame(yes)
+	no = pd.DataFrame(no)
+		
+	required =  int(len(yes) - ((len(no)+len(yes)) * use))
+	if required < 0:
+		no = no[:required]
+	while True:
+		no = no.drop_duplicates(subset = ['ticker','dt'])
+		required =  int(len(yes) - ((len(no)+len(yes)) * use))
+		sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
+		if required < 0 or len(sample) == len(no): break
+		sample = sample[:required + 1]
+		no = pd.concat([no,sample])
+	df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
+	df['tf'] = st.split('_')[0]
+	return df
+
+
+
+
+def worker(bar):
+	ticker, dt, value, tf = bar
+	
+	ss = 50
+	try:
+		df = data.get(ticker,tf,dt,ss)
+		df = df.drop(columns = ['ticker','volume'])
+		if len(df) < ss:
+			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
+			df = pd.concat([add,df])
+		df = df.values.tolist()
+		df = np.array(df)
+		o = df[-1,0]
+		#v = df[-2,4]
+		for ii in range(1,3): df[-1,ii] = o
+		#df[-1,4] = 0
+
+		df = df/np.array(o)
+		#df[4] = df[4]/np.array(v)
+		df = np.log(df)
+		
+
+		np_array = df
+		
+
+
+	except:
+		df = pd.DataFrame()
+		np_array = np.zeros((ss,4))
+		print('god')
+		
+	return [ticker,dt,tf,df,'',0,np_array,value]
+
+
+
+def train(st, percent_yes, epochs):
+	df = pd.read_feather('C:/Stocks/local/data/' + st + '.feather')
+	ones = len(df[df['value'] ==1])
+	if ones < 150: 
+		print(f'{st} cannot be trained with only {ones} positives')
+		return
+	df  = sample(st, percent_yes)
+	df = df[['ticker','dt','value']]
+	df['tf'] = 'd'
+	df = df.values.tolist()
+	info = data.pool(worker,df)
+	x = np.array([x[6] for x in info])
+	y = np.array([x[7] for x in info])
+	print(x)
+	model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
+	model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
+	model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
+	model.save('C:/Stocks/sync/models/model_' + st)
+	tensorflow.keras.backend.clear_session()	
+		
+
+def worker2(bar):
+	info, st = bar
+	model = data.load_model(st)
+	for i in range(len(info)):
+		np_array = info[i][6]
+		if np_array == None: continue
+		score = model.score(np_array)[0][1]
+		
+		info[i][4] = st
+		info[i][5] = score
+		
+	return info
+
+def score(df:list,st):
+	if type(st) != list: st = [st]
+	pool = Pool(processes = int(data.get_config('Data cpu_cores')))
+	info = data.pool(worker,df)
+	
+	info = [item for sublist in pool.map(worker2,[[info,s] for s in st]) for item in sublist]
+
+	
+
+class Get:
+	
+	def __init__(self,ticker,tf,dt = None,bars = None,offset = 0):
+		self.ticker = ticker
+		self.tf = tf
+		self.date = dt
+		
+		self.df = None
+		
+
+
+		try:
+			if len(tf) == 1: tf = '1' + tf
+			dt = Data.format_date(dt)
+			if 'd' in tf or 'w' in tf: base_tf = '1d'
+			else: base_tf = '1min'
+			#try: df = feather.read_feather(Data.data_path(ticker,tf))
+			try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
+			except FileNotFoundError: df = pd.DataFrame()
+			if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
+				try: 
+					add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
+					add.iloc[0]
+				except: pass
+				else:
+					add.drop('symbol', axis = 1, inplace = True)
+					add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
+					if df.empty or add.index[0] > df.index[-1]: df = add
+					else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
+			if df.empty: raise TimeoutError
+			if dt != None and not Data.is_pre_market(dt):
+				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+				except IndexError: raise TimeoutError
+			if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
+			if 'w' in tf and not Data.is_pre_market(dt):
+				last_bar = df.tail(1)
+				df = df[:-1]
+			df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
+			if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
+			if base_tf == '1d' and Data.is_pre_market(dt): 
+				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
+				pm_price = pm_bar['pm change'] + df.iat[-1,3]
+				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
+			df['ticker'] = ticker
+			return df.dropna()[-bars:]
+		except TimeoutError: return pd.DataFrame()
+
+
+
+
+
+		
+	def get_numpy_array(self):
+		
+		ss = 50
+		
+		df = self.df.drop(columns = ['volume'])
+		if len(df) < ss:
+			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
+			df = pd.concat([add,df])
+		df = df.values.tolist()
+		df = np.array(df)
+		o = df[-1,0]
+		#v = df[-2,4]
+		for ii in range(1,3): df[-1,ii] = o
+		#df[-1,4] = 0
+
+		df = df/np.array(o)
+		#df[4] = df[4]/np.array(v)
+		df = np.log(df)
+		
+		self.np_array = df
+		
+
+
+
+
+		
+	def findex(self,dt):
+
+
+		
+		
+
+
+if __name__ == '__main__':
+	#data.train('d_EP',.05,200)
+	train('d_EP',.1,200)
+	# df = pd.read_feather('C:/Stocks/local/data/d_EP.feather')
+	# df = df[df['value'] == 1]
+	# print(df)
+	# df = df[['ticker','dt']]
+	# df['tf'] = 'd'
+	# df = df.values.tolist()
+	# print(score(df,'d_EP'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def god(p1,p2):
+#     return [x for x in p1 if x not in p2] + [x for x in p2 if x not in p1]
+
+
+
+
+
+
+
+
+
+
+
+
 '''
 df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
 lis = ""
@@ -20,43 +269,52 @@ for i in range(len(df)):
 text_file.close()'''
 
 
+#print(pd.read_feather("C:/Stocks/local/data/2h_mF.feather"))
+#data.consolidate_database()
+#setup_list = data.get_setups_list()
+#print(data.get_setups_list())
+#if __name__ == '__main__': data.train('d_F',.05,300)
+
+#df = pd.read_feather('C:/Stocks/sync/database/laptop_2h_mF.feather')
+#print(len(df[df['value'] == 1]))
 
 
-class Student:
+
+#class Student:
 
 
-	def __init__(self,name='none'):
-		self.name = name
+#	def __init__(self,name='none'):
+#		self.name = name
 
-	def ident(self):
-		print(self.name)
+#	def ident(self):
+#		print(self.name)
 
-	def set_birthday(self,birthday):
-		self.birthday = birthday
+#	def set_birthday(self,birthday):
+#		self.birthday = birthday
 
-	def read_birthday(self):
-		print(self.birthday)
-
-
-class idk(Student):
+#	def read_birthday(self):
+#		print(self.birthday)
 
 
-	#def __init__(self,name='none'):
-		#self.name1 = name
+#class idk(Student):
 
-	def ident(self):
-		print('odddd')
 
-	def gosh(self):
-		print (self.name)
+#	#def __init__(self,name='none'):
+#		#self.name1 = name
 
-#student = Student('dd')
-#student.set_birthday('september')
-#student.read_birthday()
+#	def ident(self):
+#		print('odddd')
 
-st = idk('d')
-st.gosh()
-st.ident()
+#	def gosh(self):
+#		print (self.name)
+
+##student = Student('dd')
+##student.set_birthday('september')
+##student.read_birthday()
+
+#st = idk('d')
+#st.gosh()
+#st.ident()
 
 #data.refill_backtest()
 

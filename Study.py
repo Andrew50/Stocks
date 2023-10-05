@@ -172,7 +172,8 @@ class Study:
             layout = [[sg.Image(key = '-chart1-'),sg.Image(key = '-chart2-')],
             [sg.Image(key = '-chart3-'),sg.Image(key = '-chart4-')],
             [(sg.Text(key = '-counter-'))]]
-            if self.current: layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
+            if self.current: layout += [[sg.Button('Prev'), sg.Button('Next')]]
+            #if self.current: layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
             else: 
                 df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
                 self.annotated = len(df[df['pre_annotation'] != ''])
