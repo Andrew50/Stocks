@@ -5,22 +5,22 @@ import numpy as np
 import datetime
 from Screener import Screener as screener
 from scipy.spatial.distance import euclidean
-from fastdtw import fastdtw
+from sfastdtw import sfastdtw
 import time
 class Match:
 
 	def worker(bar):
 		x, y,ticker,bars, secondColumn = bar
-		partitions = bars//10
+		partitions = bars//2
 		returns = []
 		
 		for i in range(bars,x.shape[0],partitions):
 			try:
 				df = x[i-bars:i]		
 				df = np.column_stack((df, secondColumn))
-				distance, path = fastdtw(df,y,1,euclidean)
+				distance, path = sfastdtw(df,y,1,euclidean)
 				returns.append([ticker,i,distance])
-			except: pass
+			except TimeoutError: pass
 		return returns 
 
 	def match(ticker,dt,bars,x_list):
@@ -51,7 +51,7 @@ class Match:
 		return d, ticker
 	
 if __name__ == '__main__':
-	ticker_list = screener.get('full')
+	ticker_list = screener.get('full')[:200]
 	x_list = data.pool(Match.fetch,ticker_list)
 	
 	while True:
@@ -63,4 +63,5 @@ if __name__ == '__main__':
 
 		print(f'completed in {datetime.datetime.now() - start}')
 		scores.sort(key=lambda x: x[2])
+		print(scores[:10])
 		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]
