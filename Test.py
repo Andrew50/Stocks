@@ -396,7 +396,12 @@ class Get(pd.DataFrame):
 		except TimeoutError:
 			df = pd.DataFrame()
 		super().__init__(df)
-
+		
+	def __getattribute__(self, name):
+		return super().__getattribute__(name)
+	
+	
+		
 	def __getattr__(self, name):
 		if name == 'np':
 			ss = 50
