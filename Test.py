@@ -77,7 +77,6 @@ class Data:
 	# 	except:
 	# 		df = pd.DataFrame()
 	# 		np_array = np.zeros((ss,4))
-	# 		print('god')
 		
 	# 	return [ticker,dt,tf,df,'',0,np_array,value]
 
@@ -100,7 +99,6 @@ class Data:
 		info = Data.pool(Data.worker,df)
 		x = np.array([x[6] for x in info])
 		y = np.array([x[7] for x in info])
-		print(x)
 		model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
 		model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
 		model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
@@ -349,52 +347,88 @@ class Data:
 		else: path = '1min/'
 		return Data.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
 	
-class Get(pd.DataFrame):
-	
 
+
+class GetMetaclass(type):
+	def __new__(mcs, name, bases, attrs):
+		new_class = super().__new__(mcs, name, bases, attrs)
+		# Add a new attribute `name` to the class.
+		#setattr(new_class, "name", None)
+		print(mcs)
+		print(name)
+		print(bases)
+		print(attrs)
+		setattr(new_class,'ticker','Baba')
+
+		# Override any methods of the pandas.DataFrame class that need to be customized.
+		for method in dir(pd.DataFrame):
+			if not method.startswith("__") and method not in attrs:
+				setattr(new_class, method, GetMetaclass.wrap_method(new_class, method))
+
+		return new_class
+
+	@staticmethod
+	def wrap_method(cls, method):
+		def wrapped_method(self, *args, **kwargs):
+			result = super().__getattr__(method)(self, *args, **kwargs)
+
+			# If the result is a Pandas DataFrame, return a new instance of the custom class instead.
+			if isinstance(result, pd.DataFrame):
+				return cls(result)
+
+			# Otherwise, return the result as-is.
+			return result
+
+		return wrapped_method
+	
+class Get(pd.DataFrame,metaclass = GetMetaclass):
+	
 	
 	def __init__(self,ticker='AAPL',tf='d',dt = None,bars = 0,offset = 0,value = None):
-		self.ticker = ticker
-		self.tf = tf
-		self.dt = dt
-		self.value = value
-		self.bars = bars
-		self.offset = offset
-		try:
-			if len(tf) == 1: tf = '1' + tf
-			dt = Data.format_date(dt)
-			if 'd' in tf or 'w' in tf: base_tf = '1d'
-			else: base_tf = '1min'
-			#try: df = feather.read_feather(Data.data_path(ticker,tf))
-			try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
-			except FileNotFoundError: df = pd.DataFrame()
-			if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
-				try: 
-					add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
-					add.iloc[0]
-				except: pass
-				else:
-					add.drop('symbol', axis = 1, inplace = True)
-					add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
-					if df.empty or add.index[0] > df.index[-1]: df = add
-					else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
-			if df.empty: raise TimeoutError
-			if dt != None and not Data.is_pre_market(dt):
-				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
-				except IndexError: raise TimeoutError
-			if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
-			if 'w' in tf and not Data.is_pre_market(dt):
-				last_bar = df.tail(1)
-				df = df[:-1]
-			df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
-			if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
-			if base_tf == '1d' and Data.is_pre_market(dt): 
-				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
-				pm_price = pm_bar['pm change'] + df.iat[-1,3]
-				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
-			df = df.dropna()[-bars:]
-		except TimeoutError:
-			df = pd.DataFrame()
+		if isinstance(ticker,pd.DataFrame):
+			df = ticker
+		else:
+			self.ticker = ticker
+			self.tf = tf
+			self.dt = dt
+			self.value = value
+			self.bars = bars
+			self.offset = offset
+			try:
+				if len(tf) == 1: tf = '1' + tf
+				dt = Data.format_date(dt)
+				if 'd' in tf or 'w' in tf: base_tf = '1d'
+				else: base_tf = '1min'
+				#try: df = feather.read_feather(Data.data_path(ticker,tf))
+				try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
+				except FileNotFoundError: df = pd.DataFrame()
+				if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
+					try: 
+						add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
+						add.iloc[0]
+					except: pass
+					else:
+						add.drop('symbol', axis = 1, inplace = True)
+						add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
+						if df.empty or add.index[0] > df.index[-1]: df = add
+						else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
+				if df.empty: raise TimeoutError
+				if dt != None and not Data.is_pre_market(dt):
+					try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+					except IndexError: raise TimeoutError
+				if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
+				if 'w' in tf and not Data.is_pre_market(dt):
+					last_bar = df.tail(1)
+					df = df[:-1]
+				df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
+				if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
+				if base_tf == '1d' and Data.is_pre_market(dt): 
+					pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
+					pm_price = pm_bar['pm change'] + df.iat[-1,3]
+					df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
+				df = df.dropna()[-bars:]
+			except TimeoutError:
+				df = pd.DataFrame()
 		super().__init__(df)
 		
 	def __getattribute__(self, name):
@@ -423,6 +457,8 @@ class Get(pd.DataFrame):
 		raise AttributeError
 	
 
+	
+
 	def __str__(self):
 		return f'{super().copy} {self.ticker} {self.tf} {self.value}'
 		
@@ -439,13 +475,21 @@ class Get(pd.DataFrame):
 		while df.index[i].to_pydatetime() < dt: i += 1
 		while df.index[i].to_pydatetime() > dt: i -= 1
 		return i
+	
+
+
+# class CustomDataFrame(pd.DataFrame):
+# 	def __init__(self, data, name):
+# 		super().__init__(data)
+# 		self.name = name
 
 if __name__ == '__main__':
-	df = Get('SOUN')
-	print(df)
-	print(df.copy())
-	#print(df._ticker)
-	#print(df.iloc[6:10])
+	#df = CustomDataFrame(pd.read_feather('C:/Stocks/match_training_data.feather'),name = 'god')
+	#print(df.ticker)
+	df = Get()
+	df = df.iloc[0:4]
+	print(df.ticker)
+	#df = Get('SOUN')
 	#Data.train('d_EP',.1,100)
 	
 
@@ -585,16 +629,13 @@ if __name__ == '__main__':
 # 	x = np.array([[1,1], [2,2], [3,3], [4,4], [5,5]])
 # 	y = np.array([[2,2], [3,3], [4,4]])
 # 	distance, path = fastdtw(x, y, dist=euclidean)
-# 	print(distance)
 # 	#data.train('d_EP',.05,200)
 # 	#train('d_EP',.1,200)
 # 	# df = pd.read_feather('C:/Stocks/local/data/d_EP.feather')
 # 	# df = df[df['value'] == 1]
-# 	# print(df)
 # 	# df = df[['ticker','dt']]
 # 	# df['tf'] = 'd'
 # 	# df = df.values.tolist()
-# 	# print(score(df,'d_EP'))
 
 
 
@@ -697,7 +738,6 @@ if __name__ == '__main__':
 # 		self.birthday = birthday
 
 # 	def read_birthday(self):
-# 		print(self.birthday)
 
 
 
@@ -741,10 +781,6 @@ if __name__ == '__main__':
 # 			scores.append([ticker2,score])
 
 # 	def ident(self):
-# 		print('odddd')
-
-# 			#print("Alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]))
-# 			print("Normalized alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]/(N + M)))
 # 			if False:
 # 				plt.figure(figsize=(6, 4))
 # 				plt.subplot(121)
@@ -766,9 +802,7 @@ if __name__ == '__main__':
 # 		except:
 # 			pass
 			
-# 	print(datetime.datetime.now()-start)
 # 	scores.sort(key=lambda x: x[1])
-# 	print(scores)
 #student = Student('dd')
 #student.set_birthday('september')
 #student.read_birthday()
@@ -780,7 +814,6 @@ if __name__ == '__main__':
 #data.refill_backtest()
 
 
-#print(pd.read_feather('C:/Stocks/local/data/1min/ROKU.feather'))
 #path = 'C:/Stocks/local/study/historical_setups.feather'
 
 #df = pd.read_feather(path)
@@ -816,8 +849,6 @@ if __name__ == '__main__':
 
 
 #df = (yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = True))
-#print(df)
-#print(data.get_requirements('',df,'d_EP'))
 #path = "C:/Stocks/sync/database/"
 #dir_list = os.listdir(path)
 #for p in dir_list:
@@ -844,7 +875,6 @@ if __name__ == '__main__':
 #df = pd.read_feather(p)
 #df.rename(columns={'date':'dt','req':'required','setup':'value'}, inplace = True)
 #df.to_feather(p)
-#print(df)
 
 
 
@@ -853,7 +883,6 @@ if __name__ == '__main__':
 #dt = None
 #exchange = pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange']
 #add = TvDatafeed(username="billingsandrewjohn@gmail.com",password="Steprapt04").get_hist(ticker, exchange, interval=base_tf, n_bars=100000, extended_session = True)
-#print(add)
 
 
 
@@ -867,17 +896,12 @@ if __name__ == '__main__':
 
 
 
-#print((data.get(tf = 'd',dt = datetime.datetime(2023,8,10,9,15),bars = 100)).to_string())
 #df_traits = pd.read_feather('C:/Stocks/local/account/traits.feather')
-#print(pd.read_feather('C:/Stocks/local/study/current_setups.feather'))
-#print(data.get(tf = '2min', dt = datetime.datetime(2022,8,10,9,45)))
 
 #df = pd.read_feather('C:/Stocks/sync/files/full_scan.feather')
-#print(df.columns)
 #df = df[['Ticker','Pre-market Change','Pre-market Volume','Relative Volume at Time','Exchange']]
 #df = df.rename(columns={'Ticker':'ticker','Exchange':'exchange','Pre-market Change':'pm change','Pre-market Volume':'pm volume','Relative Volume at Time':'rvol'})
 
-#print(df)
 #df.to_feather('C:/Stocks/sync/files/full_scan.feather')
 
 
@@ -894,8 +918,6 @@ if __name__ == '__main__':
 #			df.at[i,'pnl $'] = df.at[i,'size $'] * - thresh / 100
 
 #	data_table.append([sum(df['pnl $'].tolist()),thresh])
-#print(data_table)
-#print(traits)
 #top =int( max(traits['high %']))
 #data_table = []
 #for thresh in range(top, 0, -1):
@@ -909,14 +931,10 @@ if __name__ == '__main__':
 
 #    data_table.append([sum(df['pnl $'].tolist()),thresh])
 
-#print(data_table)
 
 
-##print(data.get_scale('Account fw'))
 #df = pd.read_feather('C:/Stocks/local/study/historical_setups.feather')
 #coin = pd.read_feather("F:/Stocks/local/data/d/COIN.feather")
-##print(df)
-##print(coin.to_string())
 ##df.rename(columns={'date':'datetime','req':'required','setup':'value'}, inplace = True)
 ##df.to_feather('C:/Stocks/sync/database/aj_d_EP.feather')
 ##path = "C:/Stocks/sync/database/"
@@ -933,7 +951,6 @@ if __name__ == '__main__':
 #		shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
 #	while(len(historical_setups[historical_setups["post_annotation"] == ""]) < 1500):
 #		full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-#		print(len(historical_setups[historical_setups["post_annotation"] == ""]))
 #		full_list_minus_annotation = full_list_minus_annotation.sample(frac=1)
 #		for t in range(8):
 #			screener.run(ticker=full_list_minus_annotation.iloc[t]["Ticker"], fpath=0)
