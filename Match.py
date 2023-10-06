@@ -11,7 +11,7 @@ class Match:
 
 	def worker(bar):
 		x, y,ticker,bars, secondColumn = bar
-		partitions = bars//2
+		partitions = bars//10
 		returns = []
 		
 		for i in range(bars,x.shape[0],partitions):
@@ -20,7 +20,7 @@ class Match:
 				df = np.column_stack((df, secondColumn))
 				distance, path = fastdtw(df,y,1,euclidean)
 				returns.append([ticker,i,distance])
-			except TimeoutError: pass
+			except: pass
 		return returns 
 
 	def match(ticker,dt,bars,x_list):
@@ -51,18 +51,16 @@ class Match:
 		return d, ticker
 	
 if __name__ == '__main__':
-	ticker_list = screener.get('full')[:1000]
-	print(ticker_list)
+	ticker_list = screener.get('full')
 	x_list = data.pool(Match.fetch,ticker_list)
 	
 	while True:
-		ticker = 'COIN' #input('input ticker: ')
-		dt = None#input('input date: ')
-		bars = int(input('input # bars: '))
+		ticker = input('input ticker: ')
+		dt = input('input date: ')
+		bars = int(input('input bars: '))
 		start = datetime.datetime.now()
 		scores = Match.match(ticker,dt,bars,x_list)
 
 		print(f'completed in {datetime.datetime.now() - start}')
 		scores.sort(key=lambda x: x[2])
-		print(scores[:50])
-		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:10]]
+		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]

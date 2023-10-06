@@ -1,20 +1,12 @@
-from Data import Data as data
-from matplotlib.patches import ConnectionPatch
-import matplotlib.pyplot as plt
+
+
+
+from typing import Any
 import numpy as np
-import scipy.spatial.distance as dist
-import time
-import datetime
-#from Screener import Screener as screener
-#import pandas as pd
-#import os
-#import yfinance as yf
-#from tqdm import tqdm
-import numpy as np
+from numpy.core import overrides
 import pandas as pd
 import yfinance as yf
 from tqdm import tqdm
-from Data import Data as data
 from pyarrow import feather
 from tvDatafeed import TvDatafeed
 from tensorflow.keras.optimizers import Adam
@@ -22,6 +14,7 @@ from tensorflow.keras.models import Sequential, load_model
 from multiprocessing import Pool, current_process
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
+warnings.filterwarnings("ignore")
 
 
 
@@ -30,205 +23,343 @@ import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time
 
 
 
-
-		# if False:
-		# 	plt.figure(figsize=(6, 4))
-		# 	plt.subplot(121)
-		# 	plt.title("Distance matrix")
-		# 	plt.imshow(dist_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
-		# 	plt.subplot(122)
-		# 	plt.title("Cost matrix")
-		# 	plt.imshow(cost_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
-		# 	x_path, y_path = zip(*path)
-		# 	plt.plot(y_path, x_path)
-		# 	plt.show()    
-		# 	plt.figure()
-		# 	for x_i, y_j in path:
-		# 		plt.plot([x_i, y_j], [x[x_i] + .5, y[y_j] - .5], c="C7")
-		# 	plt.plot(np.arange(x.shape[0]), x + .5, "-o", c="C3")
-		# 	plt.plot(np.arange(y.shape[0]), y - .5, "-o", c="C0")
-		# 	plt.axis("off")
-		# 	plt.show()
+class Data:
 	
-
-
-
-def dp(dist_mat):
-
-		N, M = dist_mat.shape
-	
-		# Initialize the cost matrix
-		cost_mat = np.zeros((N + 1, M + 1))
-		for i in range(1, N + 1):
-			cost_mat[i, 0] = np.inf
-		for i in range(1, M + 1):
-			cost_mat[0, i] = np.inf
-
-		# Fill the cost matrix while keeping traceback information
-		traceback_mat = np.zeros((N, M))
-		for i in range(N):
-			for j in range(M):
-				penalty = [
-					cost_mat[i, j],      # match (0)
-					cost_mat[i, j + 1],  # insertion (1)
-					cost_mat[i + 1, j]]  # deletion (2)
-				i_penalty = np.argmin(penalty)
-				cost_mat[i + 1, j + 1] = dist_mat[i, j] + penalty[i_penalty]
-				traceback_mat[i, j] = i_penalty
-
-		# Traceback from bottom right
-		i = N - 1
-		j = M - 1
-		path = [(i, j)]
-		while i > 0 or j > 0:
-			tb_type = traceback_mat[i, j]
-			if tb_type == 0:
-				# Match
-				i = i - 1
-				j = j - 1
-			elif tb_type == 1:
-				# Insertion
-				i = i - 1
-			elif tb_type == 2:
-				# Deletion
-				j = j - 1
-			path.append((i, j))
-
-		# Strip infinity edges from cost_mat before returning
-		cost_mat = cost_mat[1:, 1:]
-		return (path[::-1], cost_mat)
-
-
-
-
-
-def sample(st,use):
-
-	data.consolidate_database()
-	allsetups = pd.read_feather('C:/Stocks/local/data/' + st + '.feather').sort_values(by='dt', ascending = False).reset_index(drop = True)
-	yes = []
-	no = []
-	groups = allsetups.groupby(pd.Grouper(key='ticker'))
-	dfs = [group for _,group in groups]
-	for df in dfs:
-		df = df.reset_index(drop = True)
-		for i in range(len(df)):
-			bar = df.iloc[i]
-			if bar['value'] == 1:
-				for ii in [i + ii for ii in [-2,-1,1,2]]:
-					if abs(ii) < len(df): 
-						bar2 = df.iloc[ii]
-						if bar2['value'] == 0: no.append(bar2)
-				yes.append(bar)
-	yes = pd.DataFrame(yes)
-	no = pd.DataFrame(no)
-		
-	required =  int(len(yes) - ((len(no)+len(yes)) * use))
-	if required < 0:
-		no = no[:required]
-	while True:
-		no = no.drop_duplicates(subset = ['ticker','dt'])
+	def sample(st,use):
+		data.consolidate_database()
+		allsetups = pd.read_feather('C:/Stocks/local/data/' + st + '.feather').sort_values(by='dt', ascending = False).reset_index(drop = True)
+		yes = []
+		no = []
+		groups = allsetups.groupby(pd.Grouper(key='ticker'))
+		dfs = [group for _,group in groups]
+		for df in dfs:
+			df = df.reset_index(drop = True)
+			for i in range(len(df)):
+				bar = df.iloc[i]
+				if bar['value'] == 1:
+					for ii in [i + ii for ii in [-2,-1,1,2]]:
+						if abs(ii) < len(df): 
+							bar2 = df.iloc[ii]
+							if bar2['value'] == 0: no.append(bar2)
+					yes.append(bar)
+		yes = pd.DataFrame(yes)
+		no = pd.DataFrame(no)
 		required =  int(len(yes) - ((len(no)+len(yes)) * use))
-		sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
-		if required < 0 or len(sample) == len(no): break
-		sample = sample[:required + 1]
-		no = pd.concat([no,sample])
-	df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
-	df['tf'] = st.split('_')[0]
-	return df
+		if required < 0:
+			no = no[:required]
+		while True:
+			no = no.drop_duplicates(subset = ['ticker','dt'])
+			required =  int(len(yes) - ((len(no)+len(yes)) * use))
+			sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
+			if required < 0 or len(sample) == len(no): break
+			sample = sample[:required + 1]
+			no = pd.concat([no,sample])
+		df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
+		df['tf'] = st.split('_')[0]
+		return df
+
+	# def worker(bar):
+	# 	ticker, dt, value, tf = bar
+	# 	ss = 50
+	# 	try:
+	# 		df = data.get(ticker,tf,dt,ss)
+	# 		df = df.drop(columns = ['ticker','volume'])
+	# 		if len(df) < ss:
+	# 			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
+	# 			df = pd.concat([add,df])
+	# 		df = df.values.tolist()
+	# 		df = np.array(df)
+	# 		o = df[-1,0]
+	# 		for ii in range(1,3): df[-1,ii] = o
+	# 		df = df/np.array(o)
+	# 		df = np.log(df)
+	# 		np_array = df
+	# 	except:
+	# 		df = pd.DataFrame()
+	# 		np_array = np.zeros((ss,4))
+	# 		print('god')
+		
+	# 	return [ticker,dt,tf,df,'',0,np_array,value]
 
 
+	def worker(bar):
+		ticker, dt, value, tf = bar
+		df = Get(ticker,tf,dt,value = value)
+		
 
-
-def worker(bar):
-	ticker, dt, value, tf = bar
-	
-	ss = 50
-	try:
-		df = data.get(ticker,tf,dt,ss)
-		df = df.drop(columns = ['ticker','volume'])
-		if len(df) < ss:
-			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
-			df = pd.concat([add,df])
+	def train(st, percent_yes, epochs):
+		df = pd.read_feather('C:/Stocks/local/data/' + st + '.feather')
+		ones = len(df[df['value'] ==1])
+		if ones < 150: 
+			print(f'{st} cannot be trained with only {ones} positives')
+			return
+		df  = Data.sample(st, percent_yes)
+		df = df[['ticker','dt','value']]
+		df['tf'] = 'd'
 		df = df.values.tolist()
-		df = np.array(df)
-		o = df[-1,0]
-		#v = df[-2,4]
-		for ii in range(1,3): df[-1,ii] = o
-		#df[-1,4] = 0
-
-		df = df/np.array(o)
-		#df[4] = df[4]/np.array(v)
-		df = np.log(df)
+		info = Data.pool(Data.worker,df)
+		x = np.array([x[6] for x in info])
+		y = np.array([x[7] for x in info])
+		print(x)
+		model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
+		model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
+		model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
+		model.save('C:/Stocks/sync/models/model_' + st)
+		tensorflow.keras.backend.clear_session()	
 		
+	def worker2(bar):
+		info, st = bar
+		model = Data.load_model(st)
+		for i in range(len(info)):
+			np_array = info[i][6]
+			if np_array == None: continue
+			score = model.score(np_array)[0][1]
+			info[i][4] = st
+			info[i][5] = score
+		return info
 
-		np_array = df
-		
-
-
-	except:
-		df = pd.DataFrame()
-		np_array = np.zeros((ss,4))
-		print('god')
-		
-	return [ticker,dt,tf,df,'',0,np_array,value]
-
-
-
-def train(st, percent_yes, epochs):
-	df = pd.read_feather('C:/Stocks/local/data/' + st + '.feather')
-	ones = len(df[df['value'] ==1])
-	if ones < 150: 
-		print(f'{st} cannot be trained with only {ones} positives')
-		return
-	df  = sample(st, percent_yes)
-	df = df[['ticker','dt','value']]
-	df['tf'] = 'd'
-	df = df.values.tolist()
-	info = data.pool(worker,df)
-	x = np.array([x[6] for x in info])
-	y = np.array([x[7] for x in info])
-	print(x)
-	model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
-	model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
-	model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
-	model.save('C:/Stocks/sync/models/model_' + st)
-	tensorflow.keras.backend.clear_session()	
-		
-
-def worker2(bar):
-	info, st = bar
-	model = data.load_model(st)
-	for i in range(len(info)):
-		np_array = info[i][6]
-		if np_array == None: continue
-		score = model.score(np_array)[0][1]
-		
-		info[i][4] = st
-		info[i][5] = score
-		
-	return info
-
-def score(df:list,st):
-	if type(st) != list: st = [st]
-	pool = Pool(processes = int(data.get_config('Data cpu_cores')))
-	info = data.pool(worker,df)
+	def score(df:list,st):
+		if type(st) != list: st = [st]
+		pool = Pool(processes = int(Data.get_config('Data cpu_cores')))
+		info = Data.pool(Data.worker,df)
 	
-	info = [item for sublist in pool.map(worker2,[[info,s] for s in st]) for item in sublist]
+		info = [item for sublist in pool.map(Data.worker2,[[info,s] for s in st]) for item in sublist]
 
+	def get_requirements(ticker, df, st):
+
+		def pm_dol_vol(df):
+			time = datetime.time(0,0,0)
+			today = datetime.date.today()
+			today = datetime.datetime.combine(today,time)
+			if df.index[-1] < today or Data.is_market_open == 1: return 0
+			return df.iat[-1,4] * df.iat[-1,0]
+
+		length = len(df)
+		if length < 5: return False
+		ma_length = 15
+		if ma_length > length - 1: ma_length = length - 1
+		adr_list = []
+		dol_vol_list = []
+		for i in range(-1,-ma_length-1,-1):
+			adr_list.append((df.iat[i,1]/df.iat[i,2] - 1) * 100)
+			dol_vol_list.append(df.iat[i,3]*df.iat[i,4])
+		reqs = [float(r) for r in Data.get_config(f'Screener {st}').split(',')]
+		dol_vol_req = reqs[0] * 1000000
+		adr_req = reqs[1]
+		pm_dol_vol_req = reqs[2] * 1000000
+		if statistics.mean(adr_list) > adr_req and (statistics.mean(dol_vol_list) > dol_vol_req or pm_dol_vol(df) > pm_dol_vol_req): return True
+		return False
+
+	def run():
+		Data.check_directories()
+		#current_day = Data.format_date(yf.download(tickers = 'QQQ', period = '25y', group_by='ticker', interval = '1d', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
+		#current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
+		from Screener import Screener as screener
+		scan = screener.get('full',True)
+		batches = []
+		#for i in range(len(scan)):
+		#   ticker = scan[i]
+		#   batches.append([ticker, current_day, 'd'])
+		#   batches.append([ticker, current_minute, '1min'])
+		for i in range(len(scan)):
+			for tf in ['d','1min']: batches.append([scan[i],tf])
+		Data.pool(Data.update, batches)
+		if Data.get_config("Data identity") == 'laptop':
+			weekday = datetime.datetime.now().weekday()
+			if weekday == 4: Data.backup()
+			elif weekday == 5: Data.retrain_models()
+		Data.refill_backtest()
+
+	def retrain_models():
+		Data.consolidate_database()
+		setup_list = Data.get_setups_list()
+		for s in setup_list: Data.train(s,.05,300)#######
+
+	def update(bar):
+		ticker = bar[0]
+		#current_day = bar[1]
+		#tf = bar[2]
+		tf = bar[1]
+		exists = True
+		try:
+			df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)######
+			last_day = df.index[-1] 
+			#if last_day == current_day and False: return
+		except: exists = False
+		if tf == 'd':
+			ytf = '1d'
+			period = '25y'
+		else:
+			ytf = '1m'
+			period = '5d'
+		ydf = yf.download(tickers = ticker, period = period, group_by='ticker', interval = ytf, ignore_tz = True, progress=False, show_errors = False, threads = False, prepost = True) 
+		#ydf = yf.download(tickers = ticker, period = period, group_by='ticker', interval = ytf, ignore_tz = True, progress=False, show_errors = False, threads = False, prepost = False) 
+		ydf.drop(axis=1, labels="Adj Close",inplace = True)
+		ydf.rename(columns={'Open':'open','High':'high','Low':'low','Close':'close','Volume':'volume'}, inplace = True)
+		ydf.dropna(inplace = True)
+		if Data.is_market_open() == 1: ydf.drop(ydf.tail(1).index,inplace=True)
+		if not exists: df = ydf
+		else:
+			try: index = Data.findex(ydf, last_day) 
+			except: return
+			ydf = ydf[index + 1:]
+			df = pd.concat([df, ydf])
+		df.index.rename('datetime', inplace = True)
+		if not df.empty: 
+			if tf == '1min': pass
+				#df = df.between_time('09:30', '15:59')
+			elif tf == 'd': df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
+			df = df.reset_index()
+			feather.write_feather(df,Data.data_path(ticker,tf))
+
+	def get_config(name):
+		s  = open("C:/Stocks/config.txt", "r").read()
+		trait = name.split(' ')[1]
+		script = name.split(' ')[0]
+		trait.replace(' ','')
+		bars = s.split('-')
+		found = False
+		for bar in bars:
+			if script in bar: 
+				found = True
+				break
+		if not found: raise Exception(str(f'{script} not found in config'))
+		lines = bar.splitlines()
+		found = False
+		for line in lines:
+			if trait in line.split('=')[0]: 
+				found = True
+				break
+		if not found: raise Exception(str(f'{trait} not found in config'))
+		value = line.split('=')[1].replace(' ','')
+		try: value = float(value)
+		except: pass
+		return value
+
+
+	def load_model(st):
+		start = datetime.datetime.now()
+		model = load_model('C:/Stocks/sync/models/model_' + st)
+		print(f'{st} model loaded in {datetime.datetime.now() - start}')
+		return model
+
+	def check_directories():
+		dirs = ['C:/Stocks/local','C:/Stocks/local/data','C:/Stocks/local/account','C:/Stocks/local/study','C:/Stocks/local/trainer','C:/Stocks/local/data/1min','C:/Stocks/local/data/d']
+		if not os.path.exists(dirs[0]): 
+			for d in dirs: os.mkdir(d)
+		if not os.path.exists("C:/Stocks/config.txt"): shutil.copyfile('C:/Stocks/sync/files/default_config.txt','C:/Stocks/config.txt')
+
+	def refill_backtest():
+		from Screener import Screener as screener
+		try: historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+		except: historical_setups = pd.DataFrame()
+		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"): shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+		while historical_setups.empty or (len(historical_setups[historical_setups["pre_annotation"] == ""]) < 2500):
+			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather").sample(frac=1)
+			screener.run(ticker = full_list_minus_annotation[:20]['ticker'].tolist(), fpath = 0)
+			full_list_minus_annotation = full_list_minus_annotation[20:].reset_index(drop=True)
+			full_list_minus_annotation.to_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
+			historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+
+	def backup():
+		date = datetime.date.today()
+		src = r'C:/Stocks'
+		dst = r'C:/Backups/' + str(date)
+		shutil.copytree(src, dst)
+		path = "C:/Backups/"
+		dir_list = os.listdir(path)
+		for b in dir_list:
+			dt = datetime.datetime.strptime(b, '%Y-%m-%d')
+			if (datetime.datetime.now() - dt).days > 30: shutil.rmtree((path + b))
+
+	def add_setup(ticker,date,setup,val,req,ident = None):
+		date = Data.format_date(date)
+		add = pd.DataFrame({ 'ticker':[ticker], 'dt':[date], 'value':[val], 'required':[req] })
+		if ident == None: ident = Data.get_config('Data identity') + '_'
+		path = 'C:/Stocks/sync/database/' + ident + setup + '.feather'
+		try: df = pd.read_feather(path)
+		except FileNotFoundError: df = pd.DataFrame()
+		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','dt'],keep = 'last').reset_index(drop = True)
+		df.to_feather(path)
+
+	def consolidate_database(): 
+		setups = Data.get_setups_list()
+		for setup in setups:
+			df = pd.DataFrame()
+			#for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
+			for ident in ['desktop_','laptop_']:
+				try: 
+					df1 = pd.read_feather(f"C:/Stocks/sync/database/{ident}{setup}.feather").dropna()
+					df1['sindex'] = df1.index
+					df1['source'] = ident
+					df = pd.concat([df,df1]).reset_index(drop = True)
+				except FileNotFoundError: pass
+			df.to_feather(f"C:/Stocks/local/data/{setup}.feather")
+
+	def get_setups_list():
+		setups = []
+		path = "C:/Stocks/sync/database/"
+		dir_list = os.listdir(path)
+		for p in dir_list:
+			s = p.split('_')
+			s = s[1] + '_' + s[2].split('.')[0]
+			use = True
+			for h in setups:
+				if s == h:
+					use = False
+					break
+			if use: setups.append(s)
+		return setups
+	
+	def format_date(dt):
+		if dt == 'current': return datetime.datetime.now(pytz.timezone('EST'))
+		if dt == None: return None
+		if isinstance(dt,str):
+			try: dt = datetime.datetime.strptime(dt, '%Y-%m-%d')
+			except: dt = datetime.datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+		time = datetime.time(dt.hour,dt.minute,0)
+		dt = datetime.datetime.combine(dt.date(),time)
+		if dt.hour == 0 and dt.minute == 0:
+			time = datetime.time(9,30,0)
+			dt = datetime.datetime.combine(dt.date(),time)
+		return dt
+
+	def is_market_open():
+		dayOfWeek = datetime.datetime.now().weekday()
+		if(dayOfWeek == 5 or dayOfWeek == 6): return 0
+		dt = datetime.datetime.now(pytz.timezone('US/Eastern'))
+		hour = dt.hour
+		minute = dt.minute
+		if hour >= 10 and hour <= 16: return 1
+		elif hour == 9 and minute >= 30: return 1
+		return 0
+
+	def pool(deff,arg):
+		pool = Pool(processes = int(Data.get_config('Data cpu_cores')))
+		data = list(tqdm(pool.imap_unordered(deff, arg), total=len(arg)))
+		return data
+
+	def is_pre_market(dt):
+		if dt == None: return False
+		if dt.hour < 9 or (dt.hour == 9 and dt.minute < 30): return True
+		return False
+
+	def data_path(ticker,tf):
+		if 'd' in tf or 'w' in tf: path = 'd/' 
+		else: path = '1min/'
+		return Data.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
+	
+class Get(pd.DataFrame):
 	
 
-class Get:
 	
-	def __init__(self,ticker,tf,dt = None,bars = None,offset = 0):
+	def __init__(self,ticker='AAPL',tf='d',dt = None,bars = 0,offset = 0,value = None):
 		self.ticker = ticker
 		self.tf = tf
-		self.date = dt
-		
-		self.df = None
-		
-
-
+		self.dt = dt
+		self.value = value
+		self.bars = bars
+		self.offset = offset
 		try:
 			if len(tf) == 1: tf = '1' + tf
 			dt = Data.format_date(dt)
@@ -261,67 +392,204 @@ class Get:
 				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
 				pm_price = pm_bar['pm change'] + df.iat[-1,3]
 				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
-			df['ticker'] = ticker
-			return df.dropna()[-bars:]
-		except TimeoutError: return pd.DataFrame()
+			df = df.dropna()[-bars:]
+		except TimeoutError:
+			df = pd.DataFrame()
+		super().__init__(df)
 
+	def __getattr__(self, name):
+		if name == 'np':
+			ss = 50
+			df = self.df
+			df = df.drop(columns = ['volume'])
+			if len(df) < ss:
+				add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
+				df = pd.concat([add,df])
+			#df = df.values.tolist()
+			#df = np.array(df)
+			df = df.to_numpy()
+			o = df[-1,0]
+			for ii in range(1,3): df[-1,ii] = o
+			df = df/np.array(o)
+			df = np.log(df)
+			self.np = df
+			#np.reverse())0#########################################--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+			return self.np
+		raise AttributeError
+	
 
-
-
-
-		
-	def get_numpy_array(self):
-		
-		ss = 50
-		
-		df = self.df.drop(columns = ['volume'])
-		if len(df) < ss:
-			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
-			df = pd.concat([add,df])
-		df = df.values.tolist()
-		df = np.array(df)
-		o = df[-1,0]
-		#v = df[-2,4]
-		for ii in range(1,3): df[-1,ii] = o
-		#df[-1,4] = 0
-
-		df = df/np.array(o)
-		#df[4] = df[4]/np.array(v)
-		df = np.log(df)
-		
-		self.np_array = df
-		
-
-
-
-
+	def __str__(self):
+		return f'{super().copy} {self.ticker} {self.tf} {self.value}'
 		
 	def findex(self,dt):
-
-
-		
-		
-
+		dt = Data.format_date(dt)
+		df = self.df
+		i = int(len(df)/2)
+		k = int(i/2)
+		while k != 0:
+			date = df.index[i].to_pydatetime()
+			if date > dt: i -= k
+			elif date < dt: i += k
+			k = int(k/2)
+		while df.index[i].to_pydatetime() < dt: i += 1
+		while df.index[i].to_pydatetime() > dt: i -= 1
+		return i
 
 if __name__ == '__main__':
-	import numpy as np
-	from scipy.spatial.distance import euclidean
+	df = Get('SOUN')
+	print(df)
+	print(df.copy())
+	#print(df._ticker)
+	#print(df.iloc[6:10])
+	#Data.train('d_EP',.1,100)
+	
 
-	from fastdtw import fastdtw
 
-	x = np.array([[1,1], [2,2], [3,3], [4,4], [5,5]])
-	y = np.array([[2,2], [3,3], [4,4]])
-	distance, path = fastdtw(x, y, dist=euclidean)
-	print(distance)
-	#data.train('d_EP',.05,200)
-	#train('d_EP',.1,200)
-	# df = pd.read_feather('C:/Stocks/local/data/d_EP.feather')
-	# df = df[df['value'] == 1]
-	# print(df)
-	# df = df[['ticker','dt']]
-	# df['tf'] = 'd'
-	# df = df.values.tolist()
-	# print(score(df,'d_EP'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		# if False:
+		# 	plt.figure(figsize=(6, 4))
+		# 	plt.subplot(121)
+		# 	plt.title("Distance matrix")
+		# 	plt.imshow(dist_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+		# 	plt.subplot(122)
+		# 	plt.title("Cost matrix")
+		# 	plt.imshow(cost_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+		# 	x_path, y_path = zip(*path)
+		# 	plt.plot(y_path, x_path)
+		# 	plt.show()    
+		# 	plt.figure()
+		# 	for x_i, y_j in path:
+		# 		plt.plot([x_i, y_j], [x[x_i] + .5, y[y_j] - .5], c="C7")
+		# 	plt.plot(np.arange(x.shape[0]), x + .5, "-o", c="C3")
+		# 	plt.plot(np.arange(y.shape[0]), y - .5, "-o", c="C0")
+		# 	plt.axis("off")
+		# 	plt.show()
+	
+
+
+
+# def dp(dist_mat):
+
+# 		N, M = dist_mat.shape
+	
+# 		# Initialize the cost matrix
+# 		cost_mat = np.zeros((N + 1, M + 1))
+# 		for i in range(1, N + 1):
+# 			cost_mat[i, 0] = np.inf
+# 		for i in range(1, M + 1):
+# 			cost_mat[0, i] = np.inf
+
+# 		# Fill the cost matrix while keeping traceback information
+# 		traceback_mat = np.zeros((N, M))
+# 		for i in range(N):
+# 			for j in range(M):
+# 				penalty = [
+# 					cost_mat[i, j],      # match (0)
+# 					cost_mat[i, j + 1],  # insertion (1)
+# 					cost_mat[i + 1, j]]  # deletion (2)
+# 				i_penalty = np.argmin(penalty)
+# 				cost_mat[i + 1, j + 1] = dist_mat[i, j] + penalty[i_penalty]
+# 				traceback_mat[i, j] = i_penalty
+
+# 		# Traceback from bottom right
+# 		i = N - 1
+# 		j = M - 1
+# 		path = [(i, j)]
+# 		while i > 0 or j > 0:
+# 			tb_type = traceback_mat[i, j]
+# 			if tb_type == 0:
+# 				# Match
+# 				i = i - 1
+# 				j = j - 1
+# 			elif tb_type == 1:
+# 				# Insertion
+# 				i = i - 1
+# 			elif tb_type == 2:
+# 				# Deletion
+# 				j = j - 1
+# 			path.append((i, j))
+
+# 		# Strip infinity edges from cost_mat before returning
+# 		cost_mat = cost_mat[1:, 1:]
+# 		return (path[::-1], cost_mat)
+
+
+
+
+
+
+
+
+# if __name__ == '__main__':
+# 	import numpy as np
+# 	from scipy.spatial.distance import euclidean
+
+# 	from fastdtw import fastdtw
+
+# 	x = np.array([[1,1], [2,2], [3,3], [4,4], [5,5]])
+# 	y = np.array([[2,2], [3,3], [4,4]])
+# 	distance, path = fastdtw(x, y, dist=euclidean)
+# 	print(distance)
+# 	#data.train('d_EP',.05,200)
+# 	#train('d_EP',.1,200)
+# 	# df = pd.read_feather('C:/Stocks/local/data/d_EP.feather')
+# 	# df = df[df['value'] == 1]
+# 	# print(df)
+# 	# df = df[['ticker','dt']]
+# 	# df['tf'] = 'd'
+# 	# df = df.values.tolist()
+# 	# print(score(df,'d_EP'))
 
 
 
@@ -357,145 +625,145 @@ if __name__ == '__main__':
 
 
 
-'''
-df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
-lis = ""
+# '''
+# df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
+# lis = ""
 
-text_file = open(r"C:/Stocks/full_ticker_list_list.txt", 'w')
-for i in range(len(df)):
-	if('/' not in str(df.iloc[i]['Ticker'])):
-		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
-text_file.close()'''
-def dp(dist_mat):
-	"""
-	Find minimum-cost path through matrix `dist_mat` using dynamic programming.
+# text_file = open(r"C:/Stocks/full_ticker_list_list.txt", 'w')
+# for i in range(len(df)):
+# 	if('/' not in str(df.iloc[i]['Ticker'])):
+# 		text_file.write(str(df.iloc[i]['Ticker']) + "\n")  
+# text_file.close()'''
+# def dp(dist_mat):
+# 	"""
+# 	Find minimum-cost path through matrix `dist_mat` using dynamic programming.
 
-	The cost of a path is defined as the sum of the matrix entries on that
-	path. See the following for details of the algorithm:
+# 	The cost of a path is defined as the sum of the matrix entries on that
+# 	path. See the following for details of the algorithm:
 
-	- http://en.wikipedia.org/wiki/Dynamic_time_warping
-	- https://www.ee.columbia.edu/~dpwe/resources/matlab/dtw/dp.m
+# 	- http://en.wikipedia.org/wiki/Dynamic_time_warping
+# 	- https://www.ee.columbia.edu/~dpwe/resources/matlab/dtw/dp.m
 
-	The notation in the first reference was followed, while Dan Ellis's code
-	(second reference) was used to check for correctness. Returns a list of
-	path indices and the cost matrix.
-	"""
+# 	The notation in the first reference was followed, while Dan Ellis's code
+# 	(second reference) was used to check for correctness. Returns a list of
+# 	path indices and the cost matrix.
+# 	"""
 
-	N, M = dist_mat.shape
+# 	N, M = dist_mat.shape
 	
-	# Initialize the cost matrix
-	cost_mat = np.zeros((N + 1, M + 1))
-	for i in range(1, N + 1):
-		cost_mat[i, 0] = np.inf
-	for i in range(1, M + 1):
-		cost_mat[0, i] = np.inf
+# 	# Initialize the cost matrix
+# 	cost_mat = np.zeros((N + 1, M + 1))
+# 	for i in range(1, N + 1):
+# 		cost_mat[i, 0] = np.inf
+# 	for i in range(1, M + 1):
+# 		cost_mat[0, i] = np.inf
 
-	# Fill the cost matrix while keeping traceback information
-	traceback_mat = np.zeros((N, M))
-	for i in range(N):
-		for j in range(M):
-			penalty = [
-				cost_mat[i, j],      # match (0)
-				cost_mat[i, j + 1],  # insertion (1)
-				cost_mat[i + 1, j]]  # deletion (2)
-			i_penalty = np.argmin(penalty)
-			cost_mat[i + 1, j + 1] = dist_mat[i, j] + penalty[i_penalty]
-			traceback_mat[i, j] = i_penalty
+# 	# Fill the cost matrix while keeping traceback information
+# 	traceback_mat = np.zeros((N, M))
+# 	for i in range(N):
+# 		for j in range(M):
+# 			penalty = [
+# 				cost_mat[i, j],      # match (0)
+# 				cost_mat[i, j + 1],  # insertion (1)
+# 				cost_mat[i + 1, j]]  # deletion (2)
+# 			i_penalty = np.argmin(penalty)
+# 			cost_mat[i + 1, j + 1] = dist_mat[i, j] + penalty[i_penalty]
+# 			traceback_mat[i, j] = i_penalty
 
-	# Traceback from bottom right
-	i = N - 1
-	j = M - 1
-	path = [(i, j)]
-	while i > 0 or j > 0:
-		tb_type = traceback_mat[i, j]
-		if tb_type == 0:
-			# Match
-			i = i - 1
-			j = j - 1
-		elif tb_type == 1:
-			# Insertion
-			i = i - 1
-		elif tb_type == 2:
-			# Deletion
-			j = j - 1
-		path.append((i, j))
+# 	# Traceback from bottom right
+# 	i = N - 1
+# 	j = M - 1
+# 	path = [(i, j)]
+# 	while i > 0 or j > 0:
+# 		tb_type = traceback_mat[i, j]
+# 		if tb_type == 0:
+# 			# Match
+# 			i = i - 1
+# 			j = j - 1
+# 		elif tb_type == 1:
+# 			# Insertion
+# 			i = i - 1
+# 		elif tb_type == 2:
+# 			# Deletion
+# 			j = j - 1
+# 		path.append((i, j))
 
-	def set_birthday(self,birthday):
-		self.birthday = birthday
+# 	def set_birthday(self,birthday):
+# 		self.birthday = birthday
 
-	def read_birthday(self):
-		print(self.birthday)
+# 	def read_birthday(self):
+# 		print(self.birthday)
 
 
 
-	def rolling_change(df):
-		d = np.zeros((df.shape[0]-1))
-		for i in range(len(d)):
-			d[i] = df[i+1]/df[i] - 1
-		return d
-	ticker1 = "QQQ"
-	#ticker2list = ['ENPH','NUE','IOT','KWEB','AAPL','U',"FSLR", "COIN", "AMR", "MRNA", "COST", "T", "W", "ARKK", "X", "CLF", "UUUU"]
-	ticker2list = ['']
-	scores = []
-	start = datetime.datetime.now()
-	for ticker2 in ticker2list:
-		try:     
-			dt1 = None
-			dt2 = None
-			df = data.get(ticker1, 'd', bars=50, dt=dt1)
-			df = df.iloc[:, 3]
-			x = df.to_numpy() 
-			#x = x / np.array(x[0])
-			#x = df.to_numpy()
-			df = data.get(ticker2, 'd', bars=50, dt=dt2)
-			df = df.iloc[:, 3]
-			y = df.to_numpy()   
+# 	def rolling_change(df):
+# 		d = np.zeros((df.shape[0]-1))
+# 		for i in range(len(d)):
+# 			d[i] = df[i+1]/df[i] - 1
+# 		return d
+# 	ticker1 = "QQQ"
+# 	#ticker2list = ['ENPH','NUE','IOT','KWEB','AAPL','U',"FSLR", "COIN", "AMR", "MRNA", "COST", "T", "W", "ARKK", "X", "CLF", "UUUU"]
+# 	ticker2list = ['']
+# 	scores = []
+# 	start = datetime.datetime.now()
+# 	for ticker2 in ticker2list:
+# 		try:     
+# 			dt1 = None
+# 			dt2 = None
+# 			df = data.get(ticker1, 'd', bars=50, dt=dt1)
+# 			df = df.iloc[:, 3]
+# 			x = df.to_numpy() 
+# 			#x = x / np.array(x[0])
+# 			#x = df.to_numpy()
+# 			df = data.get(ticker2, 'd', bars=50, dt=dt2)
+# 			df = df.iloc[:, 3]
+# 			y = df.to_numpy()   
 		
-			x = rolling_change(x)
-			y = rolling_change(y)
-			#y = y / np.array(y[0])
-				# Distance matrix
-			N = x.shape[0]
-			M = y.shape[0]
-			dist_mat = np.zeros((N, M))
-			for i in range(N):
-				for j in range(M):
-					dist_mat[i, j] = abs(x[i] - y[j])
-							# DTW
-			path, cost_mat = dp(dist_mat)
+# 			x = rolling_change(x)
+# 			y = rolling_change(y)
+# 			#y = y / np.array(y[0])
+# 				# Distance matrix
+# 			N = x.shape[0]
+# 			M = y.shape[0]
+# 			dist_mat = np.zeros((N, M))
+# 			for i in range(N):
+# 				for j in range(M):
+# 					dist_mat[i, j] = abs(x[i] - y[j])
+# 							# DTW
+# 			path, cost_mat = dp(dist_mat)
 				
-			score = cost_mat[N - 1, M - 1]/(N + M)
-			scores.append([ticker2,score])
+# 			score = cost_mat[N - 1, M - 1]/(N + M)
+# 			scores.append([ticker2,score])
 
-	def ident(self):
-		print('odddd')
+# 	def ident(self):
+# 		print('odddd')
 
-			#print("Alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]))
-			print("Normalized alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]/(N + M)))
-			if False:
-				plt.figure(figsize=(6, 4))
-				plt.subplot(121)
-				plt.title("Distance matrix")
-				plt.imshow(dist_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
-				plt.subplot(122)
-				plt.title("Cost matrix")
-				plt.imshow(cost_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
-				x_path, y_path = zip(*path)
-				plt.plot(y_path, x_path)
-				plt.show()    
-				plt.figure()
-				for x_i, y_j in path:
-					plt.plot([x_i, y_j], [x[x_i] + .5, y[y_j] - .5], c="C7")
-				plt.plot(np.arange(x.shape[0]), x + .5, "-o", c="C3")
-				plt.plot(np.arange(y.shape[0]), y - .5, "-o", c="C0")
-				plt.axis("off")
-				plt.show()
-		except:
-			pass
+# 			#print("Alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]))
+# 			print("Normalized alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]/(N + M)))
+# 			if False:
+# 				plt.figure(figsize=(6, 4))
+# 				plt.subplot(121)
+# 				plt.title("Distance matrix")
+# 				plt.imshow(dist_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+# 				plt.subplot(122)
+# 				plt.title("Cost matrix")
+# 				plt.imshow(cost_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+# 				x_path, y_path = zip(*path)
+# 				plt.plot(y_path, x_path)
+# 				plt.show()    
+# 				plt.figure()
+# 				for x_i, y_j in path:
+# 					plt.plot([x_i, y_j], [x[x_i] + .5, y[y_j] - .5], c="C7")
+# 				plt.plot(np.arange(x.shape[0]), x + .5, "-o", c="C3")
+# 				plt.plot(np.arange(y.shape[0]), y - .5, "-o", c="C0")
+# 				plt.axis("off")
+# 				plt.show()
+# 		except:
+# 			pass
 			
-	print(datetime.datetime.now()-start)
-	scores.sort(key=lambda x: x[1])
-	print(scores)
+# 	print(datetime.datetime.now()-start)
+# 	scores.sort(key=lambda x: x[1])
+# 	print(scores)
 #student = Student('dd')
 #student.set_birthday('september')
 #student.read_birthday()
