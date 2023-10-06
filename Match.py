@@ -56,7 +56,6 @@ if __name__ == '__main__':
 		bars = int(input('input # bars: '))
 		start = datetime.datetime.now()
 		scores = Match.match(ticker,dt,bars,x_list)
-		#print(scores)
 		print(f'completed in {datetime.datetime.now() - start}')
 		scores.sort(key=lambda x: x[2])
 		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:10]]
