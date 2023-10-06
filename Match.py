@@ -51,12 +51,12 @@ class Match:
 		return d, ticker
 	
 if __name__ == '__main__':
-	ticker_list = screener.get('full')[:1000]
+	ticker_list = screener.get('full')[:4000]
 	print(ticker_list)
 	x_list = data.pool(Match.fetch,ticker_list)
 	
 	while True:
-		ticker = 'COIN' #input('input ticker: ')
+		ticker = 'JBL' #input('input ticker: ')
 		dt = None#input('input date: ')
 		bars = int(input('input # bars: '))
 		start = datetime.datetime.now()
