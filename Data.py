@@ -74,7 +74,8 @@ class Data:
 					#df = dfs[ticker+str(dt)]
 					#if dt == None: df = dfs[ticker+str(dt)]
 					#else: df = dfs[ticker+str(dt.date())]
-					df = df[:Data.findex(df,dt) + 1]
+					if df.index[-1] != dt:
+						df = df[:Data.findex(df,dt) + 1]
 				except Exception as e: print(e)##########
 				else: 
 					if threshold == 0 or not use_requirements or Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
@@ -98,7 +99,6 @@ class Data:
 			if not data.empty: 
 				data['value'] = value
 				#data['key'] = df.index[i]
-				#print(str(dt))
 				#if dt == None: dfs.update({data['ticker'][0] + str('god'):data})
 				#else: dfs.update({data['ticker'][0] + str(dt):data})
 				dfs.update({data['ticker'][0]:data})
@@ -155,6 +155,7 @@ class Data:
 
 		def get_lagged_returns(df: pd.DataFrame, sample_size) -> pd.DataFrame:
 			for col in ['open', 'low', 'high', 'close']:
+			#or col in ['open', 'low', 'high', 'close','volume']:
 				return_col = df[col]/df['close'].shift(1)  - 1
 				df = time_series(df, return_col, f'feat_{col}_ret', sample_size)
 			return df
@@ -177,12 +178,19 @@ class Data:
 		dt = df.index
 		df = get_lagged_returns(df, sample_size)
 		for col in ['high','low','close']: df[f'feat_{col}_ret_t-{sample_size - 1}'] = df[f'feat_open_ret_t-{sample_size-1}']
+		#df[f'feat_volume_ret_t-{sample_size - 1}'] = 0################################
 		df = get_classification(df,value, ticker, dt)#, key)
 		return df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification'] + ['ticker'] + ['dt']]# + ['key']]
 
 	def train(st, percent_yes, epochs):
-		if len(pd.read_feather('C:/Stocks/local/data/' + st + '.feather')) < 100: return
+		df = pd.read_feather('C:/Stocks/local/data/' + st + '.feather')
+		ones = len(df[df['value'] ==1])
+		if ones < 150: 
+			print(f'{st} cannot be trained with only {ones} positives')
+			return
 		x, y  = Data.sample(st, percent_yes)
+		print(y.shape)
+		return
 		model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
 		model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
 		model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
@@ -209,15 +217,20 @@ class Data:
 					yes.append(bar)
 		yes = pd.DataFrame(yes)
 		no = pd.DataFrame(no)
+		
+		required =  int(len(yes) - ((len(no)+len(yes)) * use))
+		if required < 0:
+			no = no[:required]
 		while True:
 			no = no.drop_duplicates(subset = ['ticker','dt'])
-			required =  int(len(yes) - (len(no) * use))
+			required =  int(len(yes) - ((len(no)+len(yes)) * use))
 			sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
 			if required < 0 or len(sample) == len(no): break
 			sample = sample[:required + 1]
 			no = pd.concat([no,sample])
 		df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
 		df['tf'] = st.split('_')[0]
+		#rint(f'{st} sample ratio = {round(len(yes)/len(df),4)}')
 		num_dfs = int(Data.get_config('Data cpu_cores'))
 		s = math.ceil(len(df) / num_dfs)
 		dfs = [df[int(s*i):int(s*(i+1))] for i in range(num_dfs)]
@@ -270,11 +283,13 @@ class Data:
 		if Data.get_config("Data identity") == 'laptop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
-			elif weekday == 5:
-				Data.consolidate_database()
-				setup_list = Data.get_setups_list()
-				for s in setup_list: Data.train(s,.1,200)
+			elif weekday == 5: Data.retrain_models()
 		Data.refill_backtest()
+
+	def retrain_models():
+		Data.consolidate_database()
+		setup_list = Data.get_setups_list()
+		for s in setup_list: Data.train(s,.05,300)#######
 
 	def update(bar):
 		ticker = bar[0]

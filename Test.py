@@ -10,10 +10,353 @@ import datetime
 #import os
 #import yfinance as yf
 #from tqdm import tqdm
+import numpy as np
+import pandas as pd
+import yfinance as yf
+from tqdm import tqdm
+from Data import Data as data
+from pyarrow import feather
+from tvDatafeed import TvDatafeed
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import Sequential, load_model
+from multiprocessing import Pool, current_process
+from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
+import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 
-#import time
-#from tvDatafeed import TvDatafeed
-#import pytz
+
+
+
+
+
+
+
+
+		# if False:
+		# 	plt.figure(figsize=(6, 4))
+		# 	plt.subplot(121)
+		# 	plt.title("Distance matrix")
+		# 	plt.imshow(dist_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+		# 	plt.subplot(122)
+		# 	plt.title("Cost matrix")
+		# 	plt.imshow(cost_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+		# 	x_path, y_path = zip(*path)
+		# 	plt.plot(y_path, x_path)
+		# 	plt.show()    
+		# 	plt.figure()
+		# 	for x_i, y_j in path:
+		# 		plt.plot([x_i, y_j], [x[x_i] + .5, y[y_j] - .5], c="C7")
+		# 	plt.plot(np.arange(x.shape[0]), x + .5, "-o", c="C3")
+		# 	plt.plot(np.arange(y.shape[0]), y - .5, "-o", c="C0")
+		# 	plt.axis("off")
+		# 	plt.show()
+	
+
+
+
+def dp(dist_mat):
+
+		N, M = dist_mat.shape
+	
+		# Initialize the cost matrix
+		cost_mat = np.zeros((N + 1, M + 1))
+		for i in range(1, N + 1):
+			cost_mat[i, 0] = np.inf
+		for i in range(1, M + 1):
+			cost_mat[0, i] = np.inf
+
+		# Fill the cost matrix while keeping traceback information
+		traceback_mat = np.zeros((N, M))
+		for i in range(N):
+			for j in range(M):
+				penalty = [
+					cost_mat[i, j],      # match (0)
+					cost_mat[i, j + 1],  # insertion (1)
+					cost_mat[i + 1, j]]  # deletion (2)
+				i_penalty = np.argmin(penalty)
+				cost_mat[i + 1, j + 1] = dist_mat[i, j] + penalty[i_penalty]
+				traceback_mat[i, j] = i_penalty
+
+		# Traceback from bottom right
+		i = N - 1
+		j = M - 1
+		path = [(i, j)]
+		while i > 0 or j > 0:
+			tb_type = traceback_mat[i, j]
+			if tb_type == 0:
+				# Match
+				i = i - 1
+				j = j - 1
+			elif tb_type == 1:
+				# Insertion
+				i = i - 1
+			elif tb_type == 2:
+				# Deletion
+				j = j - 1
+			path.append((i, j))
+
+		# Strip infinity edges from cost_mat before returning
+		cost_mat = cost_mat[1:, 1:]
+		return (path[::-1], cost_mat)
+
+
+
+
+
+def sample(st,use):
+
+	data.consolidate_database()
+	allsetups = pd.read_feather('C:/Stocks/local/data/' + st + '.feather').sort_values(by='dt', ascending = False).reset_index(drop = True)
+	yes = []
+	no = []
+	groups = allsetups.groupby(pd.Grouper(key='ticker'))
+	dfs = [group for _,group in groups]
+	for df in dfs:
+		df = df.reset_index(drop = True)
+		for i in range(len(df)):
+			bar = df.iloc[i]
+			if bar['value'] == 1:
+				for ii in [i + ii for ii in [-2,-1,1,2]]:
+					if abs(ii) < len(df): 
+						bar2 = df.iloc[ii]
+						if bar2['value'] == 0: no.append(bar2)
+				yes.append(bar)
+	yes = pd.DataFrame(yes)
+	no = pd.DataFrame(no)
+		
+	required =  int(len(yes) - ((len(no)+len(yes)) * use))
+	if required < 0:
+		no = no[:required]
+	while True:
+		no = no.drop_duplicates(subset = ['ticker','dt'])
+		required =  int(len(yes) - ((len(no)+len(yes)) * use))
+		sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
+		if required < 0 or len(sample) == len(no): break
+		sample = sample[:required + 1]
+		no = pd.concat([no,sample])
+	df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
+	df['tf'] = st.split('_')[0]
+	return df
+
+
+
+
+def worker(bar):
+	ticker, dt, value, tf = bar
+	
+	ss = 50
+	try:
+		df = data.get(ticker,tf,dt,ss)
+		df = df.drop(columns = ['ticker','volume'])
+		if len(df) < ss:
+			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
+			df = pd.concat([add,df])
+		df = df.values.tolist()
+		df = np.array(df)
+		o = df[-1,0]
+		#v = df[-2,4]
+		for ii in range(1,3): df[-1,ii] = o
+		#df[-1,4] = 0
+
+		df = df/np.array(o)
+		#df[4] = df[4]/np.array(v)
+		df = np.log(df)
+		
+
+		np_array = df
+		
+
+
+	except:
+		df = pd.DataFrame()
+		np_array = np.zeros((ss,4))
+		print('god')
+		
+	return [ticker,dt,tf,df,'',0,np_array,value]
+
+
+
+def train(st, percent_yes, epochs):
+	df = pd.read_feather('C:/Stocks/local/data/' + st + '.feather')
+	ones = len(df[df['value'] ==1])
+	if ones < 150: 
+		print(f'{st} cannot be trained with only {ones} positives')
+		return
+	df  = sample(st, percent_yes)
+	df = df[['ticker','dt','value']]
+	df['tf'] = 'd'
+	df = df.values.tolist()
+	info = data.pool(worker,df)
+	x = np.array([x[6] for x in info])
+	y = np.array([x[7] for x in info])
+	print(x)
+	model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
+	model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
+	model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
+	model.save('C:/Stocks/sync/models/model_' + st)
+	tensorflow.keras.backend.clear_session()	
+		
+
+def worker2(bar):
+	info, st = bar
+	model = data.load_model(st)
+	for i in range(len(info)):
+		np_array = info[i][6]
+		if np_array == None: continue
+		score = model.score(np_array)[0][1]
+		
+		info[i][4] = st
+		info[i][5] = score
+		
+	return info
+
+def score(df:list,st):
+	if type(st) != list: st = [st]
+	pool = Pool(processes = int(data.get_config('Data cpu_cores')))
+	info = data.pool(worker,df)
+	
+	info = [item for sublist in pool.map(worker2,[[info,s] for s in st]) for item in sublist]
+
+	
+
+class Get:
+	
+	def __init__(self,ticker,tf,dt = None,bars = None,offset = 0):
+		self.ticker = ticker
+		self.tf = tf
+		self.date = dt
+		
+		self.df = None
+		
+
+
+		try:
+			if len(tf) == 1: tf = '1' + tf
+			dt = Data.format_date(dt)
+			if 'd' in tf or 'w' in tf: base_tf = '1d'
+			else: base_tf = '1min'
+			#try: df = feather.read_feather(Data.data_path(ticker,tf))
+			try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
+			except FileNotFoundError: df = pd.DataFrame()
+			if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
+				try: 
+					add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
+					add.iloc[0]
+				except: pass
+				else:
+					add.drop('symbol', axis = 1, inplace = True)
+					add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
+					if df.empty or add.index[0] > df.index[-1]: df = add
+					else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
+			if df.empty: raise TimeoutError
+			if dt != None and not Data.is_pre_market(dt):
+				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+				except IndexError: raise TimeoutError
+			if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
+			if 'w' in tf and not Data.is_pre_market(dt):
+				last_bar = df.tail(1)
+				df = df[:-1]
+			df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
+			if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
+			if base_tf == '1d' and Data.is_pre_market(dt): 
+				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
+				pm_price = pm_bar['pm change'] + df.iat[-1,3]
+				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
+			df['ticker'] = ticker
+			return df.dropna()[-bars:]
+		except TimeoutError: return pd.DataFrame()
+
+
+
+
+
+		
+	def get_numpy_array(self):
+		
+		ss = 50
+		
+		df = self.df.drop(columns = ['volume'])
+		if len(df) < ss:
+			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
+			df = pd.concat([add,df])
+		df = df.values.tolist()
+		df = np.array(df)
+		o = df[-1,0]
+		#v = df[-2,4]
+		for ii in range(1,3): df[-1,ii] = o
+		#df[-1,4] = 0
+
+		df = df/np.array(o)
+		#df[4] = df[4]/np.array(v)
+		df = np.log(df)
+		
+		self.np_array = df
+		
+
+
+
+
+		
+	def findex(self,dt):
+
+
+		
+		
+
+
+if __name__ == '__main__':
+	import numpy as np
+	from scipy.spatial.distance import euclidean
+
+	from fastdtw import fastdtw
+
+	x = np.array([[1,1], [2,2], [3,3], [4,4], [5,5]])
+	y = np.array([[2,2], [3,3], [4,4]])
+	distance, path = fastdtw(x, y, dist=euclidean)
+	print(distance)
+	#data.train('d_EP',.05,200)
+	#train('d_EP',.1,200)
+	# df = pd.read_feather('C:/Stocks/local/data/d_EP.feather')
+	# df = df[df['value'] == 1]
+	# print(df)
+	# df = df[['ticker','dt']]
+	# df['tf'] = 'd'
+	# df = df.values.tolist()
+	# print(score(df,'d_EP'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def god(p1,p2):
+#     return [x for x in p1 if x not in p2] + [x for x in p2 if x not in p1]
+
+
+
+
+
+
+
+
+
+
+
+
 '''
 df = pd.read_csv("C:/Users/csben/Downloads/america_2023-08-18.csv")
 lis = ""
@@ -77,21 +420,82 @@ def dp(dist_mat):
 			j = j - 1
 		path.append((i, j))
 
-	# Strip infinity edges from cost_mat before returning
-	cost_mat = cost_mat[1:, 1:]
-	return (path[::-1], cost_mat)
+	def set_birthday(self,birthday):
+		self.birthday = birthday
 
-if __name__ == "__main__":
-	 
-	import numpy as np
-	from scipy.spatial.distance import euclidean
+	def read_birthday(self):
+		print(self.birthday)
 
-	from fastdtw import fastdtw
 
-	x = np.array([[1,1], [2,2], [3,3], [4,4], [5,5]])
-	y = np.array([[2,2], [3,3], [4,4]])
-	distance, path = fastdtw(x, y, dist=euclidean)
-	print(distance)
+
+	def rolling_change(df):
+		d = np.zeros((df.shape[0]-1))
+		for i in range(len(d)):
+			d[i] = df[i+1]/df[i] - 1
+		return d
+	ticker1 = "QQQ"
+	#ticker2list = ['ENPH','NUE','IOT','KWEB','AAPL','U',"FSLR", "COIN", "AMR", "MRNA", "COST", "T", "W", "ARKK", "X", "CLF", "UUUU"]
+	ticker2list = ['']
+	scores = []
+	start = datetime.datetime.now()
+	for ticker2 in ticker2list:
+		try:     
+			dt1 = None
+			dt2 = None
+			df = data.get(ticker1, 'd', bars=50, dt=dt1)
+			df = df.iloc[:, 3]
+			x = df.to_numpy() 
+			#x = x / np.array(x[0])
+			#x = df.to_numpy()
+			df = data.get(ticker2, 'd', bars=50, dt=dt2)
+			df = df.iloc[:, 3]
+			y = df.to_numpy()   
+		
+			x = rolling_change(x)
+			y = rolling_change(y)
+			#y = y / np.array(y[0])
+				# Distance matrix
+			N = x.shape[0]
+			M = y.shape[0]
+			dist_mat = np.zeros((N, M))
+			for i in range(N):
+				for j in range(M):
+					dist_mat[i, j] = abs(x[i] - y[j])
+							# DTW
+			path, cost_mat = dp(dist_mat)
+				
+			score = cost_mat[N - 1, M - 1]/(N + M)
+			scores.append([ticker2,score])
+
+	def ident(self):
+		print('odddd')
+
+			#print("Alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]))
+			print("Normalized alignment cost: {:.4f}".format(cost_mat[N - 1, M - 1]/(N + M)))
+			if False:
+				plt.figure(figsize=(6, 4))
+				plt.subplot(121)
+				plt.title("Distance matrix")
+				plt.imshow(dist_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+				plt.subplot(122)
+				plt.title("Cost matrix")
+				plt.imshow(cost_mat, cmap=plt.cm.binary, interpolation="nearest", origin="lower")
+				x_path, y_path = zip(*path)
+				plt.plot(y_path, x_path)
+				plt.show()    
+				plt.figure()
+				for x_i, y_j in path:
+					plt.plot([x_i, y_j], [x[x_i] + .5, y[y_j] - .5], c="C7")
+				plt.plot(np.arange(x.shape[0]), x + .5, "-o", c="C3")
+				plt.plot(np.arange(y.shape[0]), y - .5, "-o", c="C0")
+				plt.axis("off")
+				plt.show()
+		except:
+			pass
+			
+	print(datetime.datetime.now()-start)
+	scores.sort(key=lambda x: x[1])
+	print(scores)
 #student = Student('dd')
 #student.set_birthday('september')
 #student.read_birthday()
