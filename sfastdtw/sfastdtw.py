@@ -14,7 +14,7 @@ except NameError:
 
 def sfastdtw(x, y, radius=1, dist=None):
     x, y, dist = __prep_inputs(x, y, dist)
-    return __fastdtw(x, y, radius, dist)
+    return __fastdtw(x, y, radius, dist)[0]
 
 
 def __difference(a, b):
@@ -82,6 +82,7 @@ def __dtw(x, y, window, dist):
     while not (i == j == 0):
         path.append((i-1, j-1))
         i, j = D[i, j][1], D[i, j][2]
+    #print(D[len_x, len_y][0])
     path.reverse()
     return (D[len_x, len_y][0], path)
 

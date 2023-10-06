@@ -18,7 +18,7 @@ class Match:
 			try:
 				df = x[i-bars:i]		
 				df = np.column_stack((df, secondColumn))
-				distance, path = sfastdtw(df,y,1,euclidean)
+				distance = sfastdtw(df,y,1,euclidean)
 				returns.append([ticker,i,distance])
 			except TimeoutError: pass
 		return returns 
@@ -49,9 +49,14 @@ class Match:
 			d = np.zeros((1))
 			ticker = 'failed'
 		return d, ticker
-	
+	def test():
+		x_list = data.pool(Match.fetch, ['JBL'])
+		ticker = 'JBL'
+		dt = '10/3/2023'
+		bars = 30
+		score = Match.match(ticker, dt, bars, x_list)
 if __name__ == '__main__':
-	ticker_list = screener.get('full')[:200]
+	ticker_list = screener.get('full')[:8000]
 	x_list = data.pool(Match.fetch,ticker_list)
 	
 	while True:
@@ -63,5 +68,5 @@ if __name__ == '__main__':
 
 		print(f'completed in {datetime.datetime.now() - start}')
 		scores.sort(key=lambda x: x[2])
-		print(scores[:10])
+		
 		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]
