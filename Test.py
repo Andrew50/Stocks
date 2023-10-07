@@ -359,40 +359,6 @@ class Main:
 		else: path = '1min/'
 		return Main.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
 	
-	
-	
-	
-	# def DF(ob_or_ticker = 'QQQ',df_or_tf=pd.DataFrame(),dt = None,bars = 0,offset = 0,value = None):
-	# 	if isinstance(ob_or_ticker , str):
-	# 		ticker = ob_or_ticker
-	# 		tf = df_or_tf
-	# 		if isinstance(tf,pd.DataFrame):
-	# 			tf = 'd'
-	# 		df = pd.DataFrame()
-	# 		np_df = None
-	# 	else:
-	# 		ob = ob_or_ticker
-	# 		df = df_or_tf
-			
-			
-	# 		ticker = ob.ticker
-	# 		tf = ob.tf
-	# 		dt = ob.dt
-	# 		bars = ob.bars
-	# 		offset = ob.offset
-	# 		value = ob.value
-	# 		np_df = ob.np
-	# 	return DF_Class(ticker,tf,dt,bars,offset,value,df,np_df)
-	
-
-	#def DF(ticker = 'QQQ',tf = 'd',dt = None,bars = 0,offset = 0,value = None):
-		
-		# d = {'ticker': ticker,
-  #      'tf':tf,
-  #      'dt':dt,
-  #      'bars':bars,
-  #      'offset':offset,
-  #      'value':value}
 		
 class Data:
 	
@@ -465,7 +431,7 @@ class Data:
 						#print(f'{i-bars} {i}')
 						x = d[i-bars:i]		
 						x = x.reshape(-1, 1)
-						x = normalize(x)
+						#x = normalize(x)
 						#sax = SymbolicAggregateApproximation(alphabet_size = 10,word_length=10,normalize=True)
 						#x = sax.transform(x)
 						#d = d.reshape(-1, 1)

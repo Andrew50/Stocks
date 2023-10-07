@@ -10,19 +10,16 @@ from sfastdtw import sfastdtw
 import time
 from Test import Data
 from discordwebhook import Discord
-
 import numpy as np
 from sklearn import preprocessing
 import mplfinance as mpf
 import pyts
-
 from pyts.approximation import SymbolicAggregateApproximation
 from pyts.metrics import dtw
 import pyts.approximation as sax
 
 			
 class Match:
-
 	
 	def fetch(ticker,bars=50,dt = None):
 		tf = 'd'
@@ -31,24 +28,13 @@ class Match:
 		else:
 			df = Data(ticker,tf)
 		df.np(bars,True)
-		#if dt != None:
-			#print(df.np)
 		return df
-	
 
 	def worker(bar):
 		df1, y = bar
-		def func(x,y):
-			try: return sfastdtw(x,y,1,euclidean)
-			except:
-				return float('inf')
-		print(df1.np.shape)
-		lis = np.apply_along_axis(func,0,df1.np,y)
-		# for x in df1.np:
-		# 	lis.append(sfastdtw(x,y,1,euclidean))
-		# 		#lis.append(pyts.metrics.dtw(x,y))
-		# 		#lis.append(sax(x, y))
-		# 		#lis.append( dtw(x, y, method='sakoechiba', options={'window_size': 0.5}))
+		lis = []
+		for x in df1.np:
+			lis.append(sfastdtw(x,y,1,euclidean))
 		setattr(df1,'scores',lis)
 		return df1
 	
@@ -74,3 +60,8 @@ if __name__ == '__main__':
 	print(f'completed in {datetime.datetime.now() - start}')
 	for ticker,index,score in scores[:20]:
 		print(f'{ticker} {Data(ticker).df.index[index]}')
+		
+
+						#lis.append(pyts.metrics.dtw(x,y))
+				#lis.append(sax(x, y))
+				#lis.append( dtw(x, y, method='sakoechiba', options={'window_size': 0.5}))
