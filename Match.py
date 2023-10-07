@@ -5,7 +5,7 @@ from Data import Data as data
 import numpy as np
 import datetime
 from Screener import Screener as screener
-from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import euclidean, cityblock
 from sfastdtw import sfastdtw
 import time
 from Test import Data, Get
@@ -14,12 +14,13 @@ from discordwebhook import Discord
 
 import numpy as np
 from sklearn import preprocessing
+import mplfinance as mpf
 import pyts
 
 from pyts.approximation import SymbolicAggregateApproximation
 from pyts.metrics import dtw
 
-
+			
 class Match:
 
 	def worker(bar):
@@ -65,16 +66,43 @@ class Match:
 		#arglist = [[x,y,ticker,bars, secondColumn] for x,ticker in x_list]
 		#scores = Pool().map(Match.worker,arglist)
 		#scores = data.pool(Match.worker,arglist)
-		#scores = Match.match(ticker, dt, bars, x_list)
-		print(dfs[0].scores)
+		sc = []
+		for lis in scores:
+			for s in lis:
+				sc.append(s)
+		return sc
 
-		return dfs
-		
-		
+	def fetch(ticker,dt = None,bars = 0):
+		try: 
+			df = data.get(ticker,bars = bars)
+			if len(df) < 5: raise IndexError
+			df = df.iloc[:,3]
+			x = df.to_numpy()
+			d = np.zeros((df.shape[0]-1))
+			for i in range(len(d)): #add ohlc
+				d[i] = x[i+1]/x[i] - 1
+			partitions = bars//2
+			returns = []
+			for i in range(bars,d.shape[0],partitions):
+				try:
+					df = x[i-bars:i]		
+					distance = sfastdtw(df,y,1,euclidean)
+					returns.append([ticker,i,distance])
+				except:
+					pass
+		except:
+			d = np.zeros((1))
+			ticker = 'failed'
+		return d, ticker
+	def test():
+		x_list = data.pool(Match.fetch, ['JBL'])
+		ticker = 'JBL'
+		dt = '10/3/2023'
+		bars = 30
+		score = Match.match(ticker, dt, bars, x_list)
 if __name__ == '__main__':
 	ticker_list = screener.get('full')[:50]
 	x_list = data.pool(Match.fetch,ticker_list)
-	
 	ticker = 'SMCI' #input('input ticker: ')
 	dt = '2023-05-23' #input('input date: ')
 	bars = 50 #int(input('input bars: '))
