@@ -349,39 +349,36 @@ class Data:
 	
 
 
-class GetMetaclass(type):
-	def __new__(mcs, name, bases, attrs):
-		new_class = super().__new__(mcs, name, bases, attrs)
-		# Add a new attribute `name` to the class.
-		#setattr(new_class, "name", None)
-		print(mcs)
-		print(name)
-		print(bases)
-		print(attrs)
-		setattr(new_class,'ticker','Baba')
+# class GetMetaclass(type):
+# 	def __new__(mcs, name, bases, attrs):
+# 		new_class = super().__new__(mcs, name, bases, attrs)
+# 		# Add a new attribute `name` to the class.
+# 		#setattr(new_class, "name", None)
 
-		# Override any methods of the pandas.DataFrame class that need to be customized.
-		for method in dir(pd.DataFrame):
-			if not method.startswith("__") and method not in attrs:
-				setattr(new_class, method, GetMetaclass.wrap_method(new_class, method))
+# 		setattr(new_class,'ticker','Baba')
 
-		return new_class
+# 		# Override any methods of the pandas.DataFrame class that need to be customized.
+# 		for method in dir(pd.DataFrame):
+# 			if not method.startswith("__") and method not in attrs:
+# 				setattr(new_class, method, GetMetaclass.wrap_method(new_class, method))
 
-	@staticmethod
-	def wrap_method(cls, method):
-		def wrapped_method(self, *args, **kwargs):
-			result = super().__getattr__(method)(self, *args, **kwargs)
+# 		return new_class
 
-			# If the result is a Pandas DataFrame, return a new instance of the custom class instead.
-			if isinstance(result, pd.DataFrame):
-				return cls(result)
+# 	@staticmethod
+# 	def wrap_method(cls, method):
+# 		def wrapped_method(self, *args, **kwargs):
+# 			result = super().__getattr__(method)(self, *args, **kwargs)
 
-			# Otherwise, return the result as-is.
-			return result
+# 			# If the result is a Pandas DataFrame, return a new instance of the custom class instead.
+# 			if isinstance(result, pd.DataFrame):
+# 				return cls(result)
 
-		return wrapped_method
+# 			# Otherwise, return the result as-is.
+# 			return result
+
+# 		return wrapped_method
 	
-class Get(pd.DataFrame,metaclass = GetMetaclass):
+class Get(pd.DataFrame):
 	
 	
 	def __init__(self,ticker='AAPL',tf='d',dt = None,bars = 0,offset = 0,value = None):
@@ -433,9 +430,9 @@ class Get(pd.DataFrame,metaclass = GetMetaclass):
 		
 	def __getattribute__(self, name):
 		return super().__getattribute__(name)
-	
-	
-		
+
+
+
 	def __getattr__(self, name):
 		if name == 'np':
 			ss = 50
@@ -451,12 +448,9 @@ class Get(pd.DataFrame,metaclass = GetMetaclass):
 			for ii in range(1,3): df[-1,ii] = o
 			df = df/np.array(o)
 			df = np.log(df)
-			self.np = df
-			#np.reverse())0#########################################--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+			df = np(df,0)
 			return self.np
 		raise AttributeError
-	
-
 	
 
 	def __str__(self):

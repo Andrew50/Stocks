@@ -73,17 +73,28 @@ def __dtw(x, y, window, dist):
     window = ((i + 1, j + 1) for i, j in window)
     D = defaultdict(lambda: (float('inf'),))
     D[0, 0] = (0, 0, 0)
+    k = 0
     for i, j in window:
+        k += 1
+
         dt = dist(x[i-1], y[j-1])
         D[i, j] = min((D[i-1, j][0]+dt, i-1, j), (D[i, j-1][0]+dt, i, j-1),
                       (D[i-1, j-1][0]+dt, i-1, j-1), key=lambda a: a[0])
+        
+      #  dis = D[i,j][0]
+        #if dis > 10:
+         #   raise AttributeError
+        
+    
     path = []
     i, j = len_x, len_y
+    
     while not (i == j == 0):
         path.append((i-1, j-1))
         i, j = D[i, j][1], D[i, j][2]
     #print(D[len_x, len_y][0])
     path.reverse()
+    
     return (D[len_x, len_y][0], path)
 
 
