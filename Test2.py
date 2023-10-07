@@ -20,6 +20,126 @@ import pandas as pd
 
 
 
+	
+
+
+	
+# # # # # # class DF_Class(pd.DataFrame):
+	
+	
+# # # # # # 	def __init__(self,ticker,tf,dt,bars,offset,value,df,np_df):
+# # # # # # 		self.ticker = ticker
+# # # # # # 		self.tf = tf
+# # # # # # 		self.dt = dt
+# # # # # # 		self.value = value
+# # # # # # 		self.bars = bars
+# # # # # # 		self.offset = offset
+		
+# # # # # # 		self.np = np_df
+# # # # # # 		if df.empty:
+# # # # # # 			try:
+# # # # # # 				if len(tf) == 1: tf = '1' + tf
+# # # # # # 				dt = Data.format_date(dt)
+# # # # # # 				if 'd' in tf or 'w' in tf: base_tf = '1d'
+# # # # # # 				else: base_tf = '1min'
+# # # # # # 				#try: df = feather.read_feather(Data.data_path(ticker,tf))
+# # # # # # 				try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
+# # # # # # 				except FileNotFoundError: df = pd.DataFrame()
+# # # # # # 				if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
+# # # # # # 					try: 
+# # # # # # 						add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
+# # # # # # 						add.iloc[0]
+# # # # # # 					except: pass
+# # # # # # 					else:
+# # # # # # 						add.drop('symbol', axis = 1, inplace = True)
+# # # # # # 						add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
+# # # # # # 						if df.empty or add.index[0] > df.index[-1]: df = add
+# # # # # # 						else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
+# # # # # # 				if df.empty: raise TimeoutError
+# # # # # # 				if dt != None and not Data.is_pre_market(dt):
+# # # # # # 					try: df = df[:DF_Class.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+# # # # # # 					except IndexError: raise TimeoutError
+# # # # # # 				if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
+# # # # # # 				if 'w' in tf and not Data.is_pre_market(dt):
+# # # # # # 					last_bar = df.tail(1)
+# # # # # # 					df = df[:-1]
+# # # # # # 				df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
+# # # # # # 				if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
+# # # # # # 				if base_tf == '1d' and Data.is_pre_market(dt): 
+# # # # # # 					pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
+# # # # # # 					pm_price = pm_bar['pm change'] + df.iat[-1,3]
+# # # # # # 					df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
+# # # # # # 				df = df.dropna()[-bars:]
+# # # # # # 			except TimeoutError:
+# # # # # # 				pass
+			
+# # # # # # 		super().__init__(df)
+		
+# # # # # # 	def __getattribute__(self, name):
+# # # # # # 		return super().__getattribute__(name)
+	
+# # # # # # 	def __getattr__(self, name):
+# # # # # # 		#print(name)
+# # # # # # 		raise AttributeError
+	
+# # # # # # 	def scores_table(self,threshold = 0):
+# # # # # # 		table = []
+# # # # # # 		for i in range(len(self.scores)):
+# # # # # # 			score = self.scores[i]
+# # # # # # 			if score > threshold:
+# # # # # # 				table.append([self.ticker,self.dt,score])
+				
+
+		
+# # # # # # 		return table
+	
+# # # # # # 	def preload_np(self,bars,use_1 = False):
+# # # # # # 		df = self
+# # # # # # 		#print(df)
+# # # # # # 		if use_1:
+# # # # # # 			df = df.iloc[:,3]
+# # # # # # 		x = df.to_numpy()
+# # # # # # 		d = np.zeros((x.shape[0]-1))
+# # # # # # 		for i in range(len(d)): #add ohlc
+# # # # # # 			d[i] = x[i+1]/x[i] - 1
+# # # # # # 		partitions = bars//2
+# # # # # # 		if partitions == 0:
+# # # # # # 			self.np = []
+# # # # # # 		else:
+# # # # # # 			returns = []
+# # # # # # 			for i in range(bars,d.shape[0],partitions):
+# # # # # # 				try:
+# # # # # # 					d = d[i-bars:i]		
+# # # # # # 					d = preprocessing.normalize()
+# # # # # # 					transformer = SymbolicAggregateApproximation()
+# # # # # # 					d = transformer.transform(d)
+# # # # # # 					returns.append(d)
+# # # # # # 				except:
+# # # # # # 					pass
+		
+# # # # # # 			self.np = returns
+			
+# # # # # # 	def __str__(self):
+# # # # # # 		return f'{super().copy()} {self.ticker} {self.tf} {self.value}'
+		
+# # # # # # 	def findex(self,dt):
+# # # # # # 		dt = Data.format_date(dt)
+# # # # # # 		df = self
+# # # # # # 		i = int(len(df)/2)
+# # # # # # 		k = int(i/2)
+# # # # # # 		while k != 0:
+# # # # # # 			date = df.index[i].to_pydatetime()
+# # # # # # 			if date > dt: i -= k
+# # # # # # 			elif date < dt: i += k
+# # # # # # 			k = int(k/2)
+# # # # # # 		while df.index[i].to_pydatetime() < dt: i += 1
+# # # # # # 		while df.index[i].to_pydatetime() > dt: i -= 1
+# # # # # # 		return i
+	
+
+
+
+
 # class God():
     
 # 	def __init__ (self):

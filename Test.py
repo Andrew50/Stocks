@@ -6,6 +6,7 @@ import numpy as np
 from numpy.core import overrides
 import pandas as pd
 from pandas.core.series import Series
+from scipy.stats import alpha
 import yfinance as yf
 from tqdm import tqdm
 from pyarrow import feather
@@ -16,14 +17,16 @@ from multiprocessing import Pool, current_process
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
+import numpy
 
 
-import numpy as np
-from sklearn import preprocessing
-import pyts
+# import numpy as np
+# from sklearn import preprocessing
+# import pyts
 
 from pyts.approximation import SymbolicAggregateApproximation
-from pyts.metrics import dtw
+# from pyts.metrics import dtw
+from sklearn.preprocessing import normalize
 
 
 
@@ -32,10 +35,10 @@ from pyts.metrics import dtw
 
 
 
-class Data:
+class Main:
 	
 	def sample(st,use):
-		data.consolidate_database()
+		Main.consolidate_database()
 		allsetups = pd.read_feather('C:/Stocks/local/data/' + st + '.feather').sort_values(by='dt', ascending = False).reset_index(drop = True)
 		yes = []
 		no = []
@@ -71,7 +74,7 @@ class Data:
 	# 	ticker, dt, value, tf = bar
 	# 	ss = 50
 	# 	try:
-	# 		df = data.get(ticker,tf,dt,ss)
+	# 		df = Main.get(ticker,tf,dt,ss)
 	# 		df = df.drop(columns = ['ticker','volume'])
 	# 		if len(df) < ss:
 	# 			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
@@ -92,7 +95,7 @@ class Data:
 
 	def worker(bar):
 		ticker, dt, value, tf = bar
-		df = Get(ticker,tf,dt,value = value)
+		#df = Get(ticker,tf,dt,value = value)
 		
 
 	def train(st, percent_yes, epochs):
@@ -101,11 +104,11 @@ class Data:
 		if ones < 150: 
 			print(f'{st} cannot be trained with only {ones} positives')
 			return
-		df  = Data.sample(st, percent_yes)
+		df  = Main.sample(st, percent_yes)
 		df = df[['ticker','dt','value']]
 		df['tf'] = 'd'
 		df = df.values.tolist()
-		info = Data.pool(Data.worker,df)
+		info = Main.pool(Main.worker,df)
 		x = np.array([x[6] for x in info])
 		y = np.array([x[7] for x in info])
 		model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
@@ -116,7 +119,7 @@ class Data:
 		
 	def worker2(bar):
 		info, st = bar
-		model = Data.load_model(st)
+		model = Main.load_model(st)
 		for i in range(len(info)):
 			np_array = info[i][6]
 			if np_array == None: continue
@@ -127,10 +130,10 @@ class Data:
 
 	def score(df:list,st):
 		if type(st) != list: st = [st]
-		pool = Pool(processes = int(Data.get_config('Data cpu_cores')))
-		info = Data.pool(Data.worker,df)
+		pool = Pool(processes = int(Main.get_config('Data cpu_cores')))
+		info = Main.pool(Main.worker,df)
 	
-		info = [item for sublist in pool.map(Data.worker2,[[info,s] for s in st]) for item in sublist]
+		info = [item for sublist in pool.map(Main.worker2,[[info,s] for s in st]) for item in sublist]
 
 	def get_requirements(ticker, df, st):
 
@@ -138,7 +141,7 @@ class Data:
 			time = datetime.time(0,0,0)
 			today = datetime.date.today()
 			today = datetime.datetime.combine(today,time)
-			if df.index[-1] < today or Data.is_market_open == 1: return 0
+			if df.index[-1] < today or Main.is_market_open == 1: return 0
 			return df.iat[-1,4] * df.iat[-1,0]
 
 		length = len(df)
@@ -150,7 +153,7 @@ class Data:
 		for i in range(-1,-ma_length-1,-1):
 			adr_list.append((df.iat[i,1]/df.iat[i,2] - 1) * 100)
 			dol_vol_list.append(df.iat[i,3]*df.iat[i,4])
-		reqs = [float(r) for r in Data.get_config(f'Screener {st}').split(',')]
+		reqs = [float(r) for r in Main.get_config(f'Screener {st}').split(',')]
 		dol_vol_req = reqs[0] * 1000000
 		adr_req = reqs[1]
 		pm_dol_vol_req = reqs[2] * 1000000
@@ -158,9 +161,9 @@ class Data:
 		return False
 
 	def run():
-		Data.check_directories()
-		#current_day = Data.format_date(yf.download(tickers = 'QQQ', period = '25y', group_by='ticker', interval = '1d', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
-		#current_minute = Data.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Data.is_market_open()])
+		Main.check_directories()
+		#current_day = Main.format_date(yf.download(tickers = 'QQQ', period = '25y', group_by='ticker', interval = '1d', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Main.is_market_open()])
+		#current_minute = Main.format_date(yf.download(tickers = 'QQQ', period = '5d', group_by='ticker', interval = '1m', ignore_tz = True, progress = False, show_errors = False, threads = False, prepost = False).index[-1-Main.is_market_open()])
 		from Screener import Screener as screener
 		scan = screener.get('full',True)
 		batches = []
@@ -170,17 +173,17 @@ class Data:
 		#   batches.append([ticker, current_minute, '1min'])
 		for i in range(len(scan)):
 			for tf in ['d','1min']: batches.append([scan[i],tf])
-		Data.pool(Data.update, batches)
-		if Data.get_config("Data identity") == 'laptop':
+		Main.pool(Main.update, batches)
+		if Main.get_config("Data identity") == 'laptop':
 			weekday = datetime.datetime.now().weekday()
-			if weekday == 4: Data.backup()
-			elif weekday == 5: Data.retrain_models()
-		Data.refill_backtest()
+			if weekday == 4: Main.backup()
+			elif weekday == 5: Main.retrain_models()
+		Main.refill_backtest()
 
 	def retrain_models():
-		Data.consolidate_database()
-		setup_list = Data.get_setups_list()
-		for s in setup_list: Data.train(s,.05,300)#######
+		Main.consolidate_database()
+		setup_list = Main.get_setups_list()
+		for s in setup_list: Main.train(s,.05,300)#######
 
 	def update(bar):
 		ticker = bar[0]
@@ -189,7 +192,7 @@ class Data:
 		tf = bar[1]
 		exists = True
 		try:
-			df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)######
+			df = feather.read_feather(Main.data_path(ticker,tf)).set_index('datetime',drop = True)######
 			last_day = df.index[-1] 
 			#if last_day == current_day and False: return
 		except: exists = False
@@ -204,10 +207,10 @@ class Data:
 		ydf.drop(axis=1, labels="Adj Close",inplace = True)
 		ydf.rename(columns={'Open':'open','High':'high','Low':'low','Close':'close','Volume':'volume'}, inplace = True)
 		ydf.dropna(inplace = True)
-		if Data.is_market_open() == 1: ydf.drop(ydf.tail(1).index,inplace=True)
+		if Main.is_market_open() == 1: ydf.drop(ydf.tail(1).index,inplace=True)
 		if not exists: df = ydf
 		else:
-			try: index = Data.findex(ydf, last_day) 
+			try: index = Main.findex(ydf, last_day) 
 			except: return
 			ydf = ydf[index + 1:]
 			df = pd.concat([df, ydf])
@@ -217,7 +220,7 @@ class Data:
 				#df = df.between_time('09:30', '15:59')
 			elif tf == 'd': df.index = df.index.normalize() + pd.Timedelta(minutes = 570)
 			df = df.reset_index()
-			feather.write_feather(df,Data.data_path(ticker,tf))
+			feather.write_feather(df,Main.data_path(ticker,tf))
 
 	def get_config(name):
 		s  = open("C:/Stocks/config.txt", "r").read()
@@ -280,9 +283,9 @@ class Data:
 			if (datetime.datetime.now() - dt).days > 30: shutil.rmtree((path + b))
 
 	def add_setup(ticker,date,setup,val,req,ident = None):
-		date = Data.format_date(date)
+		date = Main.format_date(date)
 		add = pd.DataFrame({ 'ticker':[ticker], 'dt':[date], 'value':[val], 'required':[req] })
-		if ident == None: ident = Data.get_config('Data identity') + '_'
+		if ident == None: ident = Main.get_config('Data identity') + '_'
 		path = 'C:/Stocks/sync/database/' + ident + setup + '.feather'
 		try: df = pd.read_feather(path)
 		except FileNotFoundError: df = pd.DataFrame()
@@ -290,7 +293,7 @@ class Data:
 		df.to_feather(path)
 
 	def consolidate_database(): 
-		setups = Data.get_setups_list()
+		setups = Main.get_setups_list()
 		for setup in setups:
 			df = pd.DataFrame()
 			#for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
@@ -342,7 +345,7 @@ class Data:
 		return 0
 
 	def pool(deff,arg):
-		pool = Pool(processes = int(Data.get_config('Data cpu_cores')))
+		pool = Pool(processes = int(Main.get_config('Data cpu_cores')))
 		data = list(tqdm(pool.imap_unordered(deff, arg), total=len(arg)))
 		return data
 
@@ -354,138 +357,135 @@ class Data:
 	def data_path(ticker,tf):
 		if 'd' in tf or 'w' in tf: path = 'd/' 
 		else: path = '1min/'
-		return Data.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
+		return Main.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
 	
 	
 	
 	
-	def DF(ob_or_ticker = 'QQQ',df_or_tf=pd.DataFrame(),dt = None,bars = 0,offset = 0,value = None):
-		if isinstance(ob_or_ticker , str):
-			ticker = ob_or_ticker
-			tf = df_or_tf
-			if isinstance(tf,pd.DataFrame):
-				tf = 'd'
-			df = pd.DataFrame()
-			np_df = None
-		else:
-			ob = ob_or_ticker
-			df = df_or_tf
+	# def DF(ob_or_ticker = 'QQQ',df_or_tf=pd.DataFrame(),dt = None,bars = 0,offset = 0,value = None):
+	# 	if isinstance(ob_or_ticker , str):
+	# 		ticker = ob_or_ticker
+	# 		tf = df_or_tf
+	# 		if isinstance(tf,pd.DataFrame):
+	# 			tf = 'd'
+	# 		df = pd.DataFrame()
+	# 		np_df = None
+	# 	else:
+	# 		ob = ob_or_ticker
+	# 		df = df_or_tf
 			
 			
-			ticker = ob.ticker
-			tf = ob.tf
-			dt = ob.dt
-			bars = ob.bars
-			offset = ob.offset
-			value = ob.value
-			np_df = ob.np
-		return DF_Class(ticker,tf,dt,bars,offset,value,df,np_df)
-
-
+	# 		ticker = ob.ticker
+	# 		tf = ob.tf
+	# 		dt = ob.dt
+	# 		bars = ob.bars
+	# 		offset = ob.offset
+	# 		value = ob.value
+	# 		np_df = ob.np
+	# 	return DF_Class(ticker,tf,dt,bars,offset,value,df,np_df)
 	
 
-
+	#def DF(ticker = 'QQQ',tf = 'd',dt = None,bars = 0,offset = 0,value = None):
+		
+		# d = {'ticker': ticker,
+  #      'tf':tf,
+  #      'dt':dt,
+  #      'bars':bars,
+  #      'offset':offset,
+  #      'value':value}
+		
+class Data:
 	
-class DF_Class(pd.DataFrame):
-	
-	
-	def __init__(self,ticker,tf,dt,bars,offset,value,df,np_df):
+	def __init__(self,ticker = 'QQQ',tf = 'd',dt = None,bars = 0,offset = 0,value = None):
 		self.ticker = ticker
 		self.tf = tf
 		self.dt = dt
 		self.value = value
 		self.bars = bars
 		self.offset = offset
-		
-		self.np = np_df
-		if df.empty:
-			try:
-				if len(tf) == 1: tf = '1' + tf
-				dt = Data.format_date(dt)
-				if 'd' in tf or 'w' in tf: base_tf = '1d'
-				else: base_tf = '1min'
-				#try: df = feather.read_feather(Data.data_path(ticker,tf))
-				try: df = feather.read_feather(Data.data_path(ticker,tf)).set_index('datetime',drop = True)
-				except FileNotFoundError: df = pd.DataFrame()
-				if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Data.is_pre_market(dt)): 
-					try: 
-						add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Data.is_pre_market(dt))
-						add.iloc[0]
-					except: pass
-					else:
-						add.drop('symbol', axis = 1, inplace = True)
-						add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
-						if df.empty or add.index[0] > df.index[-1]: df = add
-						else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
-				if df.empty: raise TimeoutError
-				if dt != None and not Data.is_pre_market(dt):
-					try: df = df[:DF_Class.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
-					except IndexError: raise TimeoutError
-				if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
-				if 'w' in tf and not Data.is_pre_market(dt):
-					last_bar = df.tail(1)
-					df = df[:-1]
-				df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
-				if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
-				if base_tf == '1d' and Data.is_pre_market(dt): 
-					pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
-					pm_price = pm_bar['pm change'] + df.iat[-1,3]
-					df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
-				df = df.dropna()[-bars:]
-			except TimeoutError:
-				pass
+		self.scores = []
+		try:
+			if len(tf) == 1: tf = '1' + tf
+			dt = Main.format_date(dt)
+			if 'd' in tf or 'w' in tf: base_tf = '1d'
+			else: base_tf = '1min'
+			try: df = feather.read_feather(Main.data_path(ticker,tf)).set_index('datetime',drop = True)
+			except FileNotFoundError: df = pd.DataFrame()
+			if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Main.is_pre_market(dt)): 
+				try: 
+					add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Main.is_pre_market(dt))
+					add.iloc[0]
+				except: pass
+				else:
+					add.drop('symbol', axis = 1, inplace = True)
+					add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
+					if df.empty or add.index[0] > df.index[-1]: df = add
+					else: df = pd.concat([df,add[Main.findex(add,df.index[-1]) + 1:]])
+			if df.empty: raise TimeoutError
+			if dt != None and not Main.is_pre_market(dt):
+				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+				except IndexError: raise TimeoutError
+			if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
+			if 'w' in tf and not Main.is_pre_market(dt):
+				last_bar = df.tail(1)
+				df = df[:-1]
+			df = df.resample(tf,closed = 'left',label = 'left',origin = pd.Timestamp('2008-01-07 09:30:00')).apply({'open':'first','high':'max','low':'min','close':'last','volume':'sum'})
+			if 'w' in tf and not Main.is_pre_market(dt): df = pd.concat([df,last_bar])
+			if base_tf == '1d' and Main.is_pre_market(dt): 
+				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
+				pm_price = pm_bar['pm change'] + df.iat[-1,3]
+				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
+			df = df.dropna()[-bars:]
+		except TimeoutError:
+			df = pd.DataFrame()
 			
-		super().__init__(df)
+		self.df = df
+		self.len = len(df)
 		
-	def __getattribute__(self, name):
-		return super().__getattribute__(name)
-	
-	def __getattr__(self, name):
-		raise AttributeError
-	
-	def scores_table(self,threshold = 0):
-		table = []
-		for i in range(len(self.scores)):
-			score = self.scores[i]
-			if score > threshold:
-				table.append([self.ticker,self.dt,score])
-				
+	def np(self,bars,only_close):
+		returns = []
+		try:
+			df = self.df
+			if only_close:
+				df = df.iloc[:,3]
+				partitions = bars//2
+			else:
+				partitions = 1
+			x = df.to_numpy()
+			d = np.zeros((x.shape[0]-1))
+			for i in range(len(d)): #add ohlc
+				d[i] = x[i+1]/x[i] - 1
+			
+			
+			if partitions != 0:
+				#print(f'{bars} {d.shape[0]}')
+				for i in list(range(bars,d.shape[0]+1,partitions)) + [bars]:
+					#print('g')
+					try:
+						#print(f'{i-bars} {i}')
+						x = d[i-bars:i]		
+						x = x.reshape(-1, 1)
+						x = normalize(x)
+						#sax = SymbolicAggregateApproximation(alphabet_size = 10,word_length=10,normalize=True)
+						#x = sax.transform(x)
+						#d = d.reshape(-1, 1)
+						if only_close:
+							#print(x.shape)
+							x = np.column_stack((x, numpy.arange(  x.shape[0])))
+						returns.append(x)
+					except:
+						pass
+		except: 
+			return returns
+		self.np = np.array(returns)
+		
 
-		
-		return table
-	
-	def preload_np(self,bars,use_1 = False):
-		df = self
-		#print(df)
-		if use_1:
-			df = df.iloc[:,3]
-		x = df.to_numpy()
-		d = np.zeros((x.shape[0]-1))
-		for i in range(len(d)): #add ohlc
-			d[i] = x[i+1]/x[i] - 1
-		partitions = bars//2
-		if partitions == 0:
-			self.np = []
-		else:
-			returns = []
-			for i in range(bars,d.shape[0],partitions):
-				try:
-					d = d[i-bars:i]		
-					d = preprocessing.normalize()
-					transformer = SymbolicAggregateApproximation()
-					d = transformer.transform(d)
-					returns.append(d)
-				except:
-					pass
-		
-			self.np = returns
-			
-	def __str__(self):
-		return f'{super().copy()} {self.ticker} {self.tf} {self.value}'
-		
 	def findex(self,dt):
-		dt = Data.format_date(dt)
-		df = self
+		dt = Main.format_date(dt)
+		if isinstance(self,pd.DataFrame):
+			df = self
+		else:
+			df = self.df
 		i = int(len(df)/2)
 		k = int(i/2)
 		while k != 0:
@@ -496,21 +496,29 @@ class DF_Class(pd.DataFrame):
 		while df.index[i].to_pydatetime() < dt: i += 1
 		while df.index[i].to_pydatetime() > dt: i -= 1
 		return i
-	
+		
+		
+	def get_scores(self,threshold = 0):
+		table = []
+		for i in range(len(self.scores)):
+			score = self.scores[i]
+			if score > threshold:
+				table.append([self.ticker,i,score])
+				
+
+		return table
+
 
 	
 if __name__=='__main__':
 	
-	DF = Data.DF
-	df = DF('COIN') #create dataframe
 	
-	x = df[:100] #do something with a pandas method
+	df = Data('COIN') #create dataframe
 	
+	df.df = df.df[:100] #do something with a pandas method
 	
-	df = DF(df,x) #reassign the df to a new DF object
+ #reassign the df to a new DF object
 	
-	print(df.ticker)
-	print(df)
 	#print(df.findex('2023-04-10'))
 	
 	
@@ -657,7 +665,7 @@ if __name__=='__main__':
 # 	x = np.array([[1,1], [2,2], [3,3], [4,4], [5,5]])
 # 	y = np.array([[2,2], [3,3], [4,4]])
 # 	distance, path = fastdtw(x, y, dist=euclidean)
-# 	#data.train('d_EP',.05,200)
+# 	#Main.train('d_EP',.05,200)
 # 	#train('d_EP',.1,200)
 # 	# df = pd.read_feather('C:/Stocks/local/data/d_EP.feather')
 # 	# df = df[df['value'] == 1]
@@ -783,12 +791,12 @@ if __name__=='__main__':
 # 		try:     
 # 			dt1 = None
 # 			dt2 = None
-# 			df = data.get(ticker1, 'd', bars=50, dt=dt1)
+# 			df = Main.get(ticker1, 'd', bars=50, dt=dt1)
 # 			df = df.iloc[:, 3]
 # 			x = df.to_numpy() 
 # 			#x = x / np.array(x[0])
 # 			#x = df.to_numpy()
-# 			df = data.get(ticker2, 'd', bars=50, dt=dt2)
+# 			df = Main.get(ticker2, 'd', bars=50, dt=dt2)
 # 			df = df.iloc[:, 3]
 # 			y = df.to_numpy()   
 		
@@ -839,7 +847,7 @@ if __name__=='__main__':
 #st.gosh()
 #st.ident()
 
-#data.refill_backtest()
+#Main.refill_backtest()
 
 
 #path = 'C:/Stocks/local/study/historical_setups.feather'
@@ -886,7 +894,7 @@ if __name__=='__main__':
 #	df.rename(columns={'date':'dt','req':'required','setup':'value'}, inplace = True)	
 #	df.rename(columns={'date':'dt','req':'required','setup':'value'}, inplace = True)	
 #	for i in range(len(df)):
-#		if data.is_pre_market( df.at[i,'dt']):
+#		if Main.is_pre_market( df.at[i,'dt']):
 #			df.at[i,'dt'] =  df.at[i,'dt'].replace(hour=9, minute=30)
 #	df.to_feather(d)
 
@@ -1036,7 +1044,7 @@ if __name__=='__main__':
 #                dfsByColor.append(colordf)
 #            startdate = dfall.iloc[0]['Datetime']
 #            enddate = dfall.iloc[-1]['Datetime']
-#            df1 = data.get(ticker,tf,dt,100,50)
+#            df1 = Main.get(ticker,tf,dt,100,50)
 #            if df1.empty: 
 #                shutil.copy(r"C:\Stocks\sync\files\blank.png",p1)
 #                continue
@@ -1091,14 +1099,14 @@ if __name__=='__main__':
 #            else: mav = ()
 #            _, axlist = mpf.plot(df1, type='candle', volume=True  , 
 #                                    title=str(f'{ticker} , {tf}'), 
-#                                    style=s, warn_too_much_data=100000,returnfig = True,figratio = (data.get_config('Plot chart_aspect_ratio'),1),
-#                                    figscale=data.get_config('Plot chart_size'), panel_ratios = (5,1), mav=mav, 
+#                                    style=s, warn_too_much_data=100000,returnfig = True,figratio = (Main.get_config('Plot chart_aspect_ratio'),1),
+#                                    figscale=Main.get_config('Plot chart_size'), panel_ratios = (5,1), mav=mav, 
 #                                    tight_layout = True,
 #                                    addplot=apds)
 #            ax = axlist[0]
 #            ax.set_yscale('log')
 #            ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
-#            plt.savefig(p1, bbox_inches='tight',dpi = data.get_config('Plot chart_dpi')) 
+#            plt.savefig(p1, bbox_inches='tight',dpi = Main.get_config('Plot chart_dpi')) 
 
 
 
@@ -1107,7 +1115,7 @@ if __name__=='__main__':
 
 
 
-		#    size = (data.get_config('Traits fw')*data.get_config('Traits fs'),data.get_scal('Traits fh')*data.get_config('Traits fs'))
+		#    size = (Main.get_config('Traits fw')*Main.get_config('Traits fs'),Main.get_scal('Traits fh')*Main.get_config('Traits fs'))
 		#    if c == 0:
 		#        return
 		#    plt.clf()
