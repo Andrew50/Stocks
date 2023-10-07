@@ -41,9 +41,8 @@ class Match:
 		def func(x,y):
 			try: return sfastdtw(x,y,1,euclidean)
 			except:
-				print(x)
 				return float('inf')
-		print(df1.np)
+		print(df1.np.shape)
 		lis = np.apply_along_axis(func,0,df1.np,y)
 		# for x in df1.np:
 		# 	lis.append(sfastdtw(x,y,1,euclidean))
