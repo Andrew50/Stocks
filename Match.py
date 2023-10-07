@@ -4,7 +4,7 @@ from Data import Data as data
 import numpy as np
 import datetime
 from Screener import Screener as screener
-from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import euclidean, cityblock
 from sfastdtw import sfastdtw
 import time
 class Match:
@@ -17,8 +17,8 @@ class Match:
 		for i in range(bars,x.shape[0],partitions):
 			try:
 				df = x[i-bars:i]		
-				df = np.column_stack((df, secondColumn))
-				distance = sfastdtw(df,y,1,euclidean)
+				df = np.column_stack((df, secondColumn))	
+				distance = sfastdtw(df,y,1,cityblock)
 				returns.append([ticker,i,distance])
 			except TimeoutError: pass
 		return returns 
