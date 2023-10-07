@@ -378,7 +378,6 @@ class Data:
 			bars = ob.bars
 			offset = ob.offset
 			value = ob.value
-			df = df
 			np_df = ob.np
 		return DF_Class(ticker,tf,dt,bars,offset,value,df,np_df)
 
@@ -390,15 +389,14 @@ class Data:
 class DF_Class(pd.DataFrame):
 	
 	
-	def __init__(self,ticker='AAPL',tf='d',dt = None,bars = 0,offset = 0,value = None,df = pd.DataFrame(),np_df = None):
-	
+	def __init__(self,ticker,tf,dt,bars,offset,value,df,np_df):
 		self.ticker = ticker
 		self.tf = tf
 		self.dt = dt
 		self.value = value
 		self.bars = bars
 		self.offset = offset
-		self.scores = []
+		
 		self.np = np_df
 		if df.empty:
 			try:
@@ -421,7 +419,7 @@ class DF_Class(pd.DataFrame):
 						else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
 				if df.empty: raise TimeoutError
 				if dt != None and not Data.is_pre_market(dt):
-					try: df = df[:Get.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+					try: df = df[:DF_Class.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
 					except IndexError: raise TimeoutError
 				if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
 				if 'w' in tf and not Data.is_pre_market(dt):
@@ -456,11 +454,13 @@ class DF_Class(pd.DataFrame):
 		
 		return table
 	
-	def preload_np(self,bars):
+	def preload_np(self,bars,use_1 = False):
 		df = self
-		df = df.iloc[:,3]
+		#print(df)
+		if use_1:
+			df = df.iloc[:,3]
 		x = df.to_numpy()
-		d = np.zeros((df.shape[0]-1))
+		d = np.zeros((x.shape[0]-1))
 		for i in range(len(d)): #add ohlc
 			d[i] = x[i+1]/x[i] - 1
 		partitions = bars//2
@@ -481,7 +481,7 @@ class DF_Class(pd.DataFrame):
 			self.np = returns
 			
 	def __str__(self):
-		return f'{super().copy} {self.ticker} {self.tf} {self.value}'
+		return f'{super().copy()} {self.ticker} {self.tf} {self.value}'
 		
 	def findex(self,dt):
 		dt = Data.format_date(dt)
@@ -500,10 +500,11 @@ class DF_Class(pd.DataFrame):
 
 	
 if __name__=='__main__':
+	
 	DF = Data.DF
 	df = DF('COIN') #create dataframe
 	
-	x = df[:100]
+	x = df[:100] #do something with a pandas method
 	
 	
 	df = DF(df,x) #reassign the df to a new DF object

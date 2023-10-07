@@ -8,8 +8,9 @@ from Screener import Screener as screener
 from scipy.spatial.distance import euclidean, cityblock
 from sfastdtw import sfastdtw
 import time
-from Test import Data, Get
+from Test import Data
 from Test import Data as data
+DF = Data.DF
 from discordwebhook import Discord
 
 import numpy as np
@@ -25,16 +26,18 @@ class Match:
 
 	def worker(bar):
 		df1, df2 = bar
-		y = df2
+		lis = []
 		try:
+			y = df2.np
 			for x in df1.np:
 				try:
-					df1.scores.append( dtw(x, y, method='sakoechiba', options={'window_size': 0.5}))
+					lis.append( dtw(x, y, method='sakoechiba', options={'window_size': 0.5}))
 				except:
 					pass
 		except:
 			pass
-			
+		df1.scores = lis
+		
 		return df1
 		#rint('DTW distance:', dtw_distance)
 		# x, y,ticker,bars, secondColumn = bar
@@ -50,66 +53,41 @@ class Match:
 		# 	except: pass
 		# return returns 
 
-	
 
-	def fetch(ticker,dt = None,bars = 0):
-		df = Get(ticker,dt = dt, bars= bars)
-		if len(df) < 5: raise IndexError
-		df.preload_np(bars)
-		return df
 	
-	def match(ticker,dt,bars,x_list):
+	def match(ticker,dt,bars,dfs):
 		y = Match.fetch(ticker,dt,bars)
-		arglist = [[x,y] for x in x_list]
+		y.preload_np(bars,True)
+		arglist = [[x,y] for x in dfs]
 		dfs = data.pool(Match.worker,arglist)
 		#secondColumn = np.arange(bars)
 		#arglist = [[x,y,ticker,bars, secondColumn] for x,ticker in x_list]
-		#scores = Pool().map(Match.worker,arglist)
-		#scores = data.pool(Match.worker,arglist)
-		sc = []
-		for lis in scores:
-			for s in lis:
-				sc.append(s)
-		return sc
+		
+		return dfs
 
 	def fetch(ticker,dt = None,bars = 0):
-		try: 
-			df = data.get(ticker,bars = bars)
-			if len(df) < 5: raise IndexError
-			df = df.iloc[:,3]
-			x = df.to_numpy()
-			d = np.zeros((df.shape[0]-1))
-			for i in range(len(d)): #add ohlc
-				d[i] = x[i+1]/x[i] - 1
-			partitions = bars//2
-			returns = []
-			for i in range(bars,d.shape[0],partitions):
-				try:
-					df = x[i-bars:i]		
-					distance = sfastdtw(df,y,1,euclidean)
-					returns.append([ticker,i,distance])
-				except:
-					pass
-		except:
-			d = np.zeros((1))
-			ticker = 'failed'
-		return d, ticker
-	def test():
-		x_list = data.pool(Match.fetch, ['JBL'])
-		ticker = 'JBL'
-		dt = '10/3/2023'
-		bars = 30
-		score = Match.match(ticker, dt, bars, x_list)
+		tf = 'd'
+		df = DF(ticker,tf,dt,bars = bars)
+		
+		if len(df) < 5: raise IndexError
+		df.preload_np(bars,True)
+		
+		return df
+
 if __name__ == '__main__':
-	ticker_list = screener.get('full')[:50]
-	x_list = data.pool(Match.fetch,ticker_list)
+	ticker_list = screener.get('full')[:20]
+	
+
+	dfs = data.pool(Match.fetch,ticker_list)
 	ticker = 'SMCI' #input('input ticker: ')
 	dt = '2023-05-23' #input('input date: ')
 	bars = 50 #int(input('input bars: '))
+	
 	start = datetime.datetime.now()
-	dfs = Match.match(ticker,dt,bars,x_list)
+	dfs = Match.match(ticker,dt,bars,dfs)
 	scores = []
-	for df in dfs: scores += df.scores_table()
+	print(dfs)
+	for df in dfs: scores += df.scores
 	
 		
 	scores.sort(key=lambda x: x[2])
