@@ -9,15 +9,15 @@ from scipy.spatial.distance import euclidean, cityblock
 from sfastdtw import sfastdtw
 import time
 from Test import Data,Get
-
-
+import os
 import numpy as np
 from sklearn import preprocessing
+import mplfinance as mpf
 import pyts
 
 from pyts.approximation import SymbolicAggregateApproximation
 
-
+			
 class Match:
 
 	def worker(bar):
@@ -98,17 +98,18 @@ class Match:
 		dt = '10/3/2023'
 		bars = 30
 		score = Match.match(ticker, dt, bars, x_list)
+		
 if __name__ == '__main__':
+	
 	ticker_list = screener.get('full')[:8000]
 	x_list = data.pool(Match.fetch,ticker_list)
-	
 	ticker = 'SMCI' #input('input ticker: ')
 	dt = '22023-05-23' #input('input date: ')
 	bars = 50 #int(input('input bars: '))
 	start = datetime.datetime.now()
 	scores = Match.match(ticker,dt,bars,x_list)
 
-		print(f'completed in {datetime.datetime.now() - start}')
-		scores.sort(key=lambda x: x[2])
-		print(scores[:10])
-		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]
+	print(f'completed in {datetime.datetime.now() - start}')
+	scores.sort(key=lambda x: x[2])
+	print(scores[:10])
+	[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]
