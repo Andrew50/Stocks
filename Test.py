@@ -5,6 +5,7 @@ from typing import Any
 import numpy as np
 from numpy.core import overrides
 import pandas as pd
+from pandas.core.series import Series
 import yfinance as yf
 from tqdm import tqdm
 from pyarrow import feather
@@ -15,6 +16,14 @@ from multiprocessing import Pool, current_process
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
+
+
+import numpy as np
+from sklearn import preprocessing
+import pyts
+
+from pyts.approximation import SymbolicAggregateApproximation
+from pyts.metrics import dtw
 
 
 
@@ -347,50 +356,51 @@ class Data:
 		else: path = '1min/'
 		return Data.get_config('Data data_drive_letter') + ':/Stocks/local/data/' + path + ticker + '.feather'
 	
-
-
-# class GetMetaclass(type):
-# 	def __new__(mcs, name, bases, attrs):
-# 		new_class = super().__new__(mcs, name, bases, attrs)
-# 		# Add a new attribute `name` to the class.
-# 		#setattr(new_class, "name", None)
-
-# 		setattr(new_class,'ticker','Baba')
-
-# 		# Override any methods of the pandas.DataFrame class that need to be customized.
-# 		for method in dir(pd.DataFrame):
-# 			if not method.startswith("__") and method not in attrs:
-# 				setattr(new_class, method, GetMetaclass.wrap_method(new_class, method))
-
-# 		return new_class
-
-# 	@staticmethod
-# 	def wrap_method(cls, method):
-# 		def wrapped_method(self, *args, **kwargs):
-# 			result = super().__getattr__(method)(self, *args, **kwargs)
-
-# 			# If the result is a Pandas DataFrame, return a new instance of the custom class instead.
-# 			if isinstance(result, pd.DataFrame):
-# 				return cls(result)
-
-# 			# Otherwise, return the result as-is.
-# 			return result
-
-# 		return wrapped_method
-	
-class Get(pd.DataFrame):
 	
 	
-	def __init__(self,ticker='AAPL',tf='d',dt = None,bars = 0,offset = 0,value = None):
-		if isinstance(ticker,pd.DataFrame):
-			df = ticker
+	
+	def DF(ob_or_ticker = 'QQQ',df_or_tf=pd.DataFrame(),dt = None,bars = 0,offset = 0,value = None):
+		if isinstance(ob_or_ticker , str):
+			ticker = ob_or_ticker
+			tf = df_or_tf
+			if isinstance(tf,pd.DataFrame):
+				tf = 'd'
+			df = pd.DataFrame()
+			np_df = None
 		else:
-			self.ticker = ticker
-			self.tf = tf
-			self.dt = dt
-			self.value = value
-			self.bars = bars
-			self.offset = offset
+			ob = ob_or_ticker
+			df = df_or_tf
+			
+			
+			ticker = ob.ticker
+			tf = ob.tf
+			dt = ob.dt
+			bars = ob.bars
+			offset = ob.offset
+			value = ob.value
+			df = df
+			np_df = ob.np
+		return DF_Class(ticker,tf,dt,bars,offset,value,df,np_df)
+
+
+	
+
+
+	
+class DF_Class(pd.DataFrame):
+	
+	
+	def __init__(self,ticker='AAPL',tf='d',dt = None,bars = 0,offset = 0,value = None,df = pd.DataFrame(),np_df = None):
+	
+		self.ticker = ticker
+		self.tf = tf
+		self.dt = dt
+		self.value = value
+		self.bars = bars
+		self.offset = offset
+		self.scores = []
+		self.np = np_df
+		if df.empty:
 			try:
 				if len(tf) == 1: tf = '1' + tf
 				dt = Data.format_date(dt)
@@ -411,7 +421,7 @@ class Get(pd.DataFrame):
 						else: df = pd.concat([df,add[Data.findex(add,df.index[-1]) + 1:]])
 				if df.empty: raise TimeoutError
 				if dt != None and not Data.is_pre_market(dt):
-					try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
+					try: df = df[:Get.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
 					except IndexError: raise TimeoutError
 				if 'min' not in tf and base_tf == '1min': df = df.between_time('09:30', '15:59')##########
 				if 'w' in tf and not Data.is_pre_market(dt):
@@ -425,40 +435,57 @@ class Get(pd.DataFrame):
 					df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
 				df = df.dropna()[-bars:]
 			except TimeoutError:
-				df = pd.DataFrame()
+				pass
+			
 		super().__init__(df)
 		
 	def __getattribute__(self, name):
 		return super().__getattribute__(name)
-
-
-
+	
 	def __getattr__(self, name):
-		if name == 'np':
-			ss = 50
-			df = self.df
-			df = df.drop(columns = ['volume'])
-			if len(df) < ss:
-				add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
-				df = pd.concat([add,df])
-			#df = df.values.tolist()
-			#df = np.array(df)
-			df = df.to_numpy()
-			o = df[-1,0]
-			for ii in range(1,3): df[-1,ii] = o
-			df = df/np.array(o)
-			df = np.log(df)
-			df = np(df,0)
-			return self.np
 		raise AttributeError
 	
+	def scores_table(self,threshold = 0):
+		table = []
+		for i in range(len(self.scores)):
+			score = self.scores[i]
+			if score > threshold:
+				table.append([self.ticker,self.dt,score])
+				
 
+		
+		return table
+	
+	def preload_np(self,bars):
+		df = self
+		df = df.iloc[:,3]
+		x = df.to_numpy()
+		d = np.zeros((df.shape[0]-1))
+		for i in range(len(d)): #add ohlc
+			d[i] = x[i+1]/x[i] - 1
+		partitions = bars//2
+		if partitions == 0:
+			self.np = []
+		else:
+			returns = []
+			for i in range(bars,d.shape[0],partitions):
+				try:
+					d = d[i-bars:i]		
+					d = preprocessing.normalize()
+					transformer = SymbolicAggregateApproximation()
+					d = transformer.transform(d)
+					returns.append(d)
+				except:
+					pass
+		
+			self.np = returns
+			
 	def __str__(self):
 		return f'{super().copy} {self.ticker} {self.tf} {self.value}'
 		
 	def findex(self,dt):
 		dt = Data.format_date(dt)
-		df = self.df
+		df = self
 		i = int(len(df)/2)
 		k = int(i/2)
 		while k != 0:
@@ -471,21 +498,28 @@ class Get(pd.DataFrame):
 		return i
 	
 
-
-# class CustomDataFrame(pd.DataFrame):
-# 	def __init__(self, data, name):
-# 		super().__init__(data)
-# 		self.name = name
-
-if __name__ == '__main__':
-	#df = CustomDataFrame(pd.read_feather('C:/Stocks/match_training_data.feather'),name = 'god')
-	#print(df.ticker)
-	df = Get()
-	df = df.iloc[0:4]
-	print(df.ticker)
-	#df = Get('SOUN')
-	#Data.train('d_EP',.1,100)
 	
+if __name__=='__main__':
+	DF = Data.DF
+	df = DF('COIN') #create dataframe
+	
+	x = df[:100]
+	
+	
+	df = DF(df,x) #reassign the df to a new DF object
+	
+	print(df.ticker)
+	print(df)
+	#print(df.findex('2023-04-10'))
+	
+	
+	
+
+# # class CustomDataFrame(pd.DataFrame):
+# # 	def __init__(self, data, name):
+# # 		super().__init__(data)
+# # 		self.name = name
+
 
 
 
@@ -614,7 +648,6 @@ if __name__ == '__main__':
 
 
 
-# if __name__ == '__main__':
 # 	import numpy as np
 # 	from scipy.spatial.distance import euclidean
 
@@ -939,7 +972,6 @@ if __name__ == '__main__':
 ##    df.rename(columns={'date':'datetime','req':'required','setup':'value'}, inplace = True)
 ##    df.to_feather(d)
 
-#if __name__ == "__main__":
 #	historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 #	if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"):
 #		shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
