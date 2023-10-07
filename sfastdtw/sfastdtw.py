@@ -92,8 +92,7 @@ def __dtw(x, y, window, dist):
     while not (i == j == 0):
         path.append((i-1, j-1))
         i, j = D[i, j][1], D[i, j][2]
-    if i %100 == 0:
-        print(path)
+    #print(D[len_x, len_y][0])
     path.reverse()
     
     return (D[len_x, len_y][0], path)

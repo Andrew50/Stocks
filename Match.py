@@ -92,9 +92,14 @@ class Match:
 			d = np.zeros((1))
 			ticker = 'failed'
 		return d, ticker
-	
+	def test():
+		x_list = data.pool(Match.fetch, ['JBL'])
+		ticker = 'JBL'
+		dt = '10/3/2023'
+		bars = 30
+		score = Match.match(ticker, dt, bars, x_list)
 if __name__ == '__main__':
-	ticker_list = screener.get('full')[:200]
+	ticker_list = screener.get('full')[:8000]
 	x_list = data.pool(Match.fetch,ticker_list)
 	
 	ticker = 'SMCI' #input('input ticker: ')
@@ -103,7 +108,7 @@ if __name__ == '__main__':
 	start = datetime.datetime.now()
 	scores = Match.match(ticker,dt,bars,x_list)
 
-	print(f'completed in {datetime.datetime.now() - start}')
-	scores.sort(key=lambda x: x[2])
-	print(scores[:10])
-	[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]
+		print(f'completed in {datetime.datetime.now() - start}')
+		scores.sort(key=lambda x: x[2])
+		print(scores[:10])
+		[print(f'{ticker} {data.get(ticker).index[index]}') for ticker,index,score in scores[:50]]
