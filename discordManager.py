@@ -1,5 +1,6 @@
 import discord
 import discordwebhook
+from Data import Data as data
 class discordManager(): 
 	def initialize():
 		intents = discord.Intents.default()
