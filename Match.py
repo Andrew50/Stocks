@@ -39,11 +39,26 @@ class Match:
 		return df1
 	
 	def match(ticker,dt,bars,dfs):
-		y = Match.fetch(ticker,bars,dt).np[0]
+		y = Match.fetch(ticker,bars,dt).np[00]
+		print(y)
 		arglist = [[x,y] for x in dfs]
 		dfs = data.pool(Match.worker,arglist)
 		return dfs
-
+	
+	def initiate(ticker, dt, bars): 
+		ticker_list = screener.get('full')[:500]
+		dfs = data.pool(Match.fetch,ticker_list)
+		start = datetime.datetime.now()
+		dfs = Match.match(ticker,dt,bars,dfs)
+		scores = []
+		for df in dfs:
+			lis = df.get_scores()
+			scores += lis
+		scores.sort(key=lambda x: x[2])
+		print(f'completed in {datetime.datetime.now() - start}')
+		return scores[:20]
+		for ticker,index,score in scores[:20]:
+			print(f'{ticker} {Data(ticker).df.index[index]}')
 if __name__ == '__main__':
 	ticker = 'JBL' #input('input ticker: ')
 	dt = '2023-10-03' #input('input date: ')
