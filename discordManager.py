@@ -1,6 +1,8 @@
 import discord
 import discordwebhook
 from Data import Data as data
+from Match import Match as match 
+from Test import Data
 class discordManager(): 
 	def initialize():
 		intents = discord.Intents.default()
@@ -15,18 +17,21 @@ class discord_bot(discord.Client):
 		message_author = message.author
 		if message.content.startswith('query?'):
 			await message.channel.send('Query Initiated')
-			text = message_content.split('?').split(' ')
+			text = message_content.split('? ')[1].split(' ')
+			print(text)
 			try:
 				ticker = text[0]
-				date = text[1]
-				tf = text[2]
-				numBars = text[3]
-				df = data.get(ticker, tf, dt=date, bars=numBars)
-			except:
+				dt = text[1]
+				numBars = int(text[2])
+				await message.channel.send(f'{ticker} {dt} {numBars}')
+				returnedScores = match.initiate(ticker, dt, numBars)
+				for ticker,index,score in returnedScores:
+					await message.channel.send(f'{ticker} {Data(ticker).df.index[index]}')
+			except TimeoutError:
 				await message.channel.send('Incorrect format used.')
 				
 if __name__ == '__main__':
-	pass
+	discordManager.initialize()
 
 				
 
