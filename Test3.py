@@ -18,4 +18,7 @@ import pyts
 from pyts.approximation import SymbolicAggregateApproximation
 
 
-
+if __name__ == '__main__':
+	ticker = 'JBL' #input('input ticker: ')
+	dt = '2023-10-03' #input('input date: ')
+	bars = 10 #int(input('input bars: '))
