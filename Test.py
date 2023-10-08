@@ -435,7 +435,7 @@ class Data:
 			pass
 		
 		#self.np = returns.detach().cpu().numpy()
-		self.np = returns
+		self.np = np.array(returns)
 
 	def findex(self,dt):
 		dt = Main.format_date(dt)

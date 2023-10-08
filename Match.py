@@ -9,6 +9,7 @@ from Test import Data
 from discordwebhook import Discord
 import numpy as np
 from sklearn import preprocessing
+from sfastdtw import sfastdtw
 import mplfinance as mpf
 import torch
 from tqdm import tqdm
@@ -94,7 +95,7 @@ class Match:
 		return dfs
 	
 	def initiate(ticker, dt, bars): 
-		ticker_list = screener.get('full')[:500]
+		ticker_list = screener.get('full')[:2000]
 		dfs = data.pool(Match.fetch,ticker_list)
 		start = datetime.datetime.now()
 		dfs = Match.match(ticker,dt,bars,dfs)
@@ -110,7 +111,7 @@ class Match:
 if __name__ == '__main__':
 	
 	if True:
-		ticker_list = screener.get('full')[:10]
+		ticker_list = screener.get('full')[:2000]
 		dfs = data.pool(Match.fetch,ticker_list)
 		ticker = 'JBL' #input('input ticker: ')
 		dt = '2023-10-03' #input('input date: ')
