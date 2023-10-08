@@ -433,7 +433,7 @@ class Data:
 					try:
 						#print(f'{i-bars:i
 						x = d[i-bars:i]		
-						x = x.reshape((-1, 1))
+						x = x.reshape((bars, 1))
 						#x = normalize(x)
 						x = np.flip(x,0)
 						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))

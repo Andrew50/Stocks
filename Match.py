@@ -57,7 +57,6 @@ class Match:
 	
 	def match(ticker,dt,bars,dfs):
 		y = Match.fetch(ticker,bars,dt).np[0]
-		print(y)
 		arglist = [[x,y] for x in dfs]
 		dfs = data.pool(Match.worker,arglist)
 		return dfs
