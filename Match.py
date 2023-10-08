@@ -46,18 +46,16 @@ class Match:
 
 	def worker(bar):
 		df1, y = bar
+		
 		lis = []
-		#print(f'{df1.np[0].shape} , {y.shape}')
 		for x in df1.np:
-			print(f'{x.shape} , {y.shape}')
-			distance, path = dtw(x, y)
+			distance = dtw(x, y)
 			lis.append(distance)
 		setattr(df1,'scores',lis)
 		return df1
 	
 	def match(ticker,dt,bars,dfs):
 		y = Match.fetch(ticker,bars,dt).np[0]
-		print(y)
 		arglist = [[x,y] for x in dfs]
 		dfs = data.pool(Match.worker,arglist)
 		return dfs
@@ -77,13 +75,13 @@ class Match:
 		for ticker,index,score in scores[:20]:
 			print(f'{ticker} {Data(ticker).df.index[index]}')
 if __name__ == '__main__':
-	ticker = 'JBL' #input('input ticker: ')
-	dt = '2023-10-03' #input('input date: ')
-	bars = 10 #int(input('input bars: '))
-	y = Match.fetch(ticker,bars,dt).np
+	
 	if True:
 		ticker_list = screener.get('full')[:10]
 		dfs = data.pool(Match.fetch,ticker_list)
+		ticker = 'JBL' #input('input ticker: ')
+		dt = '2023-10-03' #input('input date: ')
+		bars = 10 #int(input('input bars: '))
 		start = datetime.datetime.now()
 		dfs = Match.match(ticker,dt,bars,dfs)
 		scores = []

@@ -17,7 +17,6 @@
 #loss = sdtw(x, y)  # Just like any torch.nn.xyzLoss()
 
 ## Aggregate and call backward()
-#print(loss)
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -77,7 +76,7 @@ if __name__ == '__main__':
     sequence1_grad = torch.autograd.grad(cost, sequence1, retain_graph=True)[0]
     sequence2_grad = torch.autograd.grad(cost, sequence2, retain_graph=True)[0]
 
-    print("Soft DTW Cost:", cost.item())
+    #print("Soft DTW Cost:", cost.item())
     #print("Gradient of Sequence 1:", sequence1_grad)
     #print("Gradient of Sequence 2:", sequence2_grad)
     

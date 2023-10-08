@@ -70,28 +70,6 @@ class Main:
 		df['tf'] = st.split('_')[0]
 		return df
 
-	# def worker(bar):
-	# 	ticker, dt, value, tf = bar
-	# 	ss = 50
-	# 	try:
-	# 		df = Main.get(ticker,tf,dt,ss)
-	# 		df = df.drop(columns = ['ticker','volume'])
-	# 		if len(df) < ss:
-	# 			add = pd.DataFrame(df.iat[-1,3], index=np.arange(ss - len(df)), columns=df.columns)
-	# 			df = pd.concat([add,df])
-	# 		df = df.values.tolist()
-	# 		df = np.array(df)
-	# 		o = df[-1,0]
-	# 		for ii in range(1,3): df[-1,ii] = o
-	# 		df = df/np.array(o)
-	# 		df = np.log(df)
-	# 		np_array = df
-	# 	except:
-	# 		df = pd.DataFrame()
-	# 		np_array = np.zeros((ss,4))
-		
-	# 	return [ticker,dt,tf,df,'',0,np_array,value]
-
 
 	def worker(bar):
 		ticker, dt, value, tf = bar
@@ -431,27 +409,25 @@ class Data:
 				# 	returns = x
 				# else:
 				for i in list(range(bars,d.shape[0]+1,partitions)):
-					try:
-						#print(f'{i-bars:i
-						x = d[i-bars:i]		
-						x = x.reshape((-1, 1))
-						#x = normalize(x)
-						x = np.flip(x,0)
-						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
-						#x = np.array(x)
-
-						x = torch.tensor(list(x), requires_grad=True).cuda()
-						#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
+					x = d[i-bars:i]		
+					x = x.reshape((-1, 1))
+					#x = normalize(x)
+					x = np.flip(x,0)
+					#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
+					#x = np.array(x)
+					x = x.reshape(-1)
+					#x = torch.tensor(list(x), requires_grad=True).cuda()
+					#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
 
 
 
-						x = x.cpu()
+					x = x
 
-						returns.append(x.detach())
-					except:
-						pass
+					#returns.append(x.detach())
+					returns.append(list(x))
+					
 				
-		except: 
+		except TimeoutError: 
 			pass
 		
 		#self.np = returns.detach().cpu().numpy()
