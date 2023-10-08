@@ -399,7 +399,6 @@ class Data:
 			d = np.zeros((x.shape[0]-1))
 			for i in range(len(d)): #add ohlc
 				d[i] = x[i+1]/x[i] - 1
-				
 			if partitions != 0:
 				# if d.shape[0] == bars-1:
 				# 	x = d.reshape(-1, 1)
@@ -409,15 +408,17 @@ class Data:
 				# 	returns = x
 				# else:
 				for i in list(range(bars,d.shape[0]+1,partitions)):
-					x = d[i-bars:i]		
-					x = x.reshape((-1, 1))
-					#x = normalize(x)
-					x = np.flip(x,0)
-					#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
-					#x = np.array(x)
-					x = x.reshape(-1)
-					#x = torch.tensor(list(x), requires_grad=True).cuda()
-					#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
+					try:
+						#print(f'{i-bars:i
+						x = d[i-bars:i]		
+						x = x.reshape((bars, 1))
+						#x = normalize(x)
+						x = np.flip(x,0)
+						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
+						#x = np.array(x)
+
+						x = torch.tensor(list(x), requires_grad=True).cuda()
+						#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
 
 
 
