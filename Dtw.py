@@ -58,6 +58,18 @@ class SoftDTW(nn.Module):
 
         return acc_cost[N - 1, M - 1], acc_grad
 
+
+def dtw(x,y):
+    pairwise_distance = torch.abs(x.unsqueeze(1) - y.unsqueeze(0)).cuda()
+
+    # Create the Soft DTW model on the GPU
+    soft_dtw = SoftDTW(gamma=1.0)
+
+    # Calculate the Soft DTW distance and gradients on the GPU
+    cost, grad = soft_dtw(pairwise_distance)
+
+    return cost.item()
+
 # Example usage
 if __name__ == '__main__':
     # Create two sequences on the GPU

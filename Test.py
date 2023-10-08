@@ -11,14 +11,14 @@ import yfinance as yf
 from tqdm import tqdm
 from pyarrow import feather
 from tvDatafeed import TvDatafeed
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import Sequential, load_model
+#from tensorflow.keras.optimizers import Adam
+#from tensorflow.keras.models import Sequential, load_model
 from multiprocessing import Pool, current_process
-from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
+#from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
 import numpy
-
+import torch
 
 # import numpy as np
 # from sklearn import preprocessing
@@ -437,15 +437,24 @@ class Data:
 						#x = normalize(x)
 						x = np.flip(x,0)
 						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
-						x = np.array(x)
-						returns.append(x)
+						#x = np.array(x)
+
+						x = torch.tensor(list(x), requires_grad=True).cuda()
+						#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
+
+
+
+
+						x = x.cpu()
+						returns.append(x.detach())
 					except:
 						pass
 				
 		except: 
 			return returns
-		self.np = np.array(returns)
 		
+		#self.np = returns.detach().cpu().numpy()
+		self.np = returns
 
 	def findex(self,dt):
 		dt = Main.format_date(dt)
