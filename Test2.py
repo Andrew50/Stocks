@@ -1,24 +1,14 @@
-from Data import Data as data
-from matplotlib.patches import ConnectionPatch
-import matplotlib.pyplot as plt
-import numpy as np
-import scipy.spatial.distance as dist
-import time
-import datetime
-from Screener import Screener as screener
-from tqdm import tqdm
-#from Screener import Screener as screener
-import pandas as pd
-#import os
+
 #import yfinance as yf
 #from tqdm import tqdm
 
 #import time
 #from tvDatafeed import TvDatafeed
 #import pytz
-
-
-
+bars = 10
+partitions = bars//2
+len = 10
+print(list(range(bars,len+1,partitions)))
 
 	
 

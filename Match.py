@@ -11,33 +11,34 @@ import numpy as np
 from sklearn import preprocessing
 import mplfinance as mpf
 import torch
-'''
-from soft_dtw_cuda.soft_dtw_cuda import SoftDTW
 
-# Create the sequences
-batch_size, len_x, len_y, dims = 8, 15, 12, 5
-x = torch.rand((batch_size, len_x, dims), requires_grad=True)
-y = torch.rand((batch_size, len_y, dims))
-# Transfer tensors to the GPU
-x = x.cuda()
-y = y.cuda()
+#from soft_dtw_cuda.soft_dtw_cuda import SoftDTW
 
-# Create the "criterion" object
-sdtw = SoftDTW(use_cuda=True, gamma=0.1)
+## Create the sequences
+#batch_size, len_x, len_y, dims = 8, 15, 12, 5
+#x = torch.rand((batch_size, len_x, dims), requires_grad=True)
+#y = torch.rand((batch_size, len_y, dims))
+## Transfer tensors to the GPU
+#x = x.cuda()
+#y = y.cuda()
 
-# Compute the loss value
-loss = sdtw(x, y)  # Just like any torch.nn.xyzLoss()
+## Create the "criterion" object
+#sdtw = SoftDTW(use_cuda=True, gamma=0.1)
 
-# Aggregate and call backward()
-loss.mean().backward()
+## Compute the loss value
+#loss = sdtw(x, y)  # Just like any torch.nn.xyzLoss()
 
-			'''
+## Aggregate and call backward()
+#loss.mean().backward()
+from Dtw import dtw as dtw
+			
 class Match:
 	
 	def fetch(ticker,bars=10,dt = None):
+		
 		tf = 'd'
 		if dt != None:
-			df = Data(ticker,tf,dt,bars = bars)
+			df = Data(ticker,tf,dt,bars = bars+1)
 		else:
 			df = Data(ticker,tf)
 		df.np(bars,True)
@@ -48,6 +49,7 @@ class Match:
 		lis = []
 		#print(f'{df1.np[0].shape} , {y.shape}')
 		for x in df1.np:
+			print(f'{x.shape} , {y.shape}')
 			distance, path = dtw(x, y)
 			lis.append(distance)
 		setattr(df1,'scores',lis)
@@ -81,7 +83,7 @@ if __name__ == '__main__':
 	y = Match.fetch(ticker,bars,dt).np
 	print(y)
 	if True:
-		ticker_list = screener.get('full')[:1000]
+		ticker_list = screener.get('full')[:10]
 		dfs = data.pool(Match.fetch,ticker_list)
 		start = datetime.datetime.now()
 		dfs = Match.match(ticker,dt,bars,dfs)

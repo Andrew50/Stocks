@@ -11,14 +11,14 @@ import yfinance as yf
 from tqdm import tqdm
 from pyarrow import feather
 from tvDatafeed import TvDatafeed
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import Sequential, load_model
+#from tensorflow.keras.optimizers import Adam
+#from tensorflow.keras.models import Sequential, load_model
 from multiprocessing import Pool, current_process
-from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
+#from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
 import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
 import numpy
-
+import torch
 
 # import numpy as np
 # from sklearn import preprocessing
@@ -431,22 +431,31 @@ class Data:
 				# else:
 				for i in list(range(bars,d.shape[0]+1,partitions)):
 					try:
-						x = d[i-bars:i+1]		
-						if(numpy.shape(x) != (10,1)):
-							print(i)
+						#print(f'{i-bars:i
+						x = d[i-bars:i]		
 						x = x.reshape((-1, 1))
 						#x = normalize(x)
 						x = np.flip(x,0)
 						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
-						x = np.array(x)				
-						returns.append(x)
-					except TimeoutError:
+						#x = np.array(x)
+
+						x = torch.tensor(list(x), requires_grad=True).cuda()
+						#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
+
+
+
+						print(x.shape)
+						x = x.cpu()
+
+						returns.append(x.detach())
+					except:
 						pass
 				
 		except: 
-			return returns
-		self.np = np.array(returns)
+			pass
 		
+		#self.np = returns.detach().cpu().numpy()
+		self.np = returns
 
 	def findex(self,dt):
 		dt = Main.format_date(dt)
@@ -485,17 +494,6 @@ if __name__=='__main__':
 	
 	df.df = df.df[:100] #do something with a pandas method
 	
- #reassign the df to a new DF object
-	
-	#print(df.findex('2023-04-10'))
-	
-	
-	
-
-# # class CustomDataFrame(pd.DataFrame):
-# # 	def __init__(self, data, name):
-# # 		super().__init__(data)
-# # 		self.name = name
 
 
 
