@@ -30,7 +30,6 @@ class SoftDTW(nn.Module):
 
     def forward(self, D):
         print(D.shape)
-        print(D.shape)
         N, M = D.shape
         D = torch.exp(-D / self.gamma).cuda()  # Move data to GPU
 
@@ -46,7 +45,7 @@ class SoftDTW(nn.Module):
                     acc_cost[i, j] = acc_cost[i - 1, j] + D[i, j]
                 elif j > 0:
                     acc_cost[i, j] = acc_cost[i, j - 1] + D[i, j]
-                else:
+                else:F
                     acc_cost[i, j] = D[i, j]
 
                 d = torch.exp(-D[i, j] / self.gamma)
