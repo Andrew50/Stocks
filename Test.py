@@ -24,7 +24,7 @@ import numpy
 # from sklearn import preprocessing
 # import pyts
 
-from pyts.approximation import SymbolicAggregateApproximation
+#from pyts.approximation import SymbolicAggregateApproximation
 # from pyts.metrics import dtw
 from sklearn.preprocessing import normalize
 
@@ -436,7 +436,8 @@ class Data:
 						x = x.reshape(-1, 1)
 						#x = normalize(x)
 						x = np.flip(x,0)
-						if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
+						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
+						x = np.array(x)
 						returns.append(x)
 					except:
 						pass

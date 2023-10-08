@@ -13,10 +13,10 @@ from discordwebhook import Discord
 import numpy as np
 from sklearn import preprocessing
 import mplfinance as mpf
-import pyts
-from pyts.approximation import SymbolicAggregateApproximation
-from pyts.metrics import dtw
-import pyts.approximation as sax
+#import pyts
+#from pyts.approximation import SymbolicAggregateApproximation
+#from pyts.metrics import dtw
+#import pyts.approximation as sax
 
 
 import numpy as np
@@ -78,7 +78,7 @@ class Match:
 		lis = []
 		#print(f'{df1.np[0].shape} , {y.shape}')
 		for x in df1.np:
-			lis.append(gpu_dtw(x,y))
+			lis.append(Match.gpu_dtw(x,y))
 		setattr(df1,'scores',lis)
 		return df1
 	
