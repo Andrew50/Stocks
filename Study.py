@@ -23,7 +23,6 @@ class Study:
             self.filter(self)
             while True:
                 self.event, self.values = self.window.read()
-                
                 if self.event in ['Yes','No']:
                     if self.event == 'Yes': v = 1
                     else: v = 0
@@ -34,7 +33,7 @@ class Study:
                     st = bar['st']
                     data.add_setup(ticker,dt,st,v,1)
                     self.event = 'Next'
-                if self.event == 'Next' and (self.i < len(self.setups_data) - 1 or (self.i < len(self.setups_data) + .5 and not self.current)): 
+                if self.event == 'Next' and (self.i < len(self.setups_data) - 1 or (self.i < len(self.setups_data) - .5 and not self.current)): 
                     self.previ = self.i
                     if self.current: self.i += 1
                     else: self.i += .5
@@ -47,7 +46,7 @@ class Study:
                     else: self.i -= .5
                     self.update(self)
                 elif self.event == 'Load':
-                    self.previ = self.i
+                    self.previ = self.i 
                     self.update(self)
                     self.filter(self)
                 if self.event == sg.WIN_CLOSED:
@@ -56,10 +55,11 @@ class Study:
                     self.window.close()
 
     def preload(self):
+        preload_amount = 10
         if self.i == 0:
-            if self.current: index_list = [float(i) for i in range(20)]
-            else: index_list = [float(i/2) for i in range(40)]
-        else: index_list = [19 + self.i]
+            if self.current: index_list = [float(i) for i in range(preload_amount)]
+            else: index_list = [float(i/2) for i in range(preload_amount*2)]
+        else: index_list = [preload_amount-1 + self.i]
         arglist = [[self.setups_data,i,self.current] for i in index_list if i < len(self.setups_data)]
         self.pool.map_async(self.plot,arglist)
         
@@ -129,7 +129,7 @@ class Study:
         first_minute_low = 1
         first_minute_close = 1
         first_minute_volume = 0
-        s = mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r'))
+        s = mpf.make_mpf_style(base_mpf_style= 'nightclouds',marketcolors=mpf.make_marketcolors(up='g',down='r',wick ='inherit',edge='inherit',volume='inherit'))
         for tf in tf_list:
             p = pathlib.Path("C:/Stocks/local/study/charts") / f'{ii}_{i}.png'
             try:
@@ -154,8 +154,11 @@ class Study:
                         df.iat[-1,4] = first_minute_volume
                 if (current or revealed) and ii == 1: title = f'{ticker} {dt} {st} {z} {tf}' 
                 else: title = str(tf)
-                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[dt], alpha = .25))
-                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
+                #if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True,vlines=dict(vlines=[dt], alpha = .25))
+                #else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1), mav=(10,20), tight_layout = True)
+                if revealed: _, axlist = mpf.plot(df, type='candle', axisoff=True,volume=True, style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1),  tight_layout = True,vlines=dict(vlines=[dt], alpha = .25))
+                else: _, axlist =  mpf.plot(df, type='candle', volume=True,axisoff=True,style=s, returnfig = True, title = title, figratio = (data.get_config('Study chart_aspect_ratio'),1),figscale=data.get_config('Study chart_size'), panel_ratios = (5,1),  tight_layout = True)
+                
                 ax = axlist[0]
                 ax.set_yscale('log')
                 ax.yaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -165,12 +168,16 @@ class Study:
 
     def update(self):
         if self.init:
-            sg.theme('DarkGrey')
+            sg.theme('Black')
             layout = [[sg.Image(key = '-chart1-'),sg.Image(key = '-chart2-')],
             [sg.Image(key = '-chart3-'),sg.Image(key = '-chart4-')],
-            [(sg.Text( key = '-counter-'))]]
-            if self.current: layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
-            else: layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],[sg.Combo([],key = '-sub_st-', size = (20,10))],[sg.Button('Prev'), sg.Button('Next'),sg.Button('Load'),sg.InputText(key = '-input_filter-')]]
+            [(sg.Text(key = '-counter-'))]]
+            if self.current: layout += [[sg.Button('Prev'), sg.Button('Next')]]
+            #if self.current: layout += [[sg.Button('Prev'), sg.Button('Next'), sg.Button('Yes'),sg.Button('No')]]
+            else: 
+                df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
+                self.annotated = len(df[df['pre_annotation'] != ''])
+                layout += [[sg.Multiline(size=(150, 5), key='-annotation-')],[sg.Combo([],key = '-sub_st-', size = (20,10))],[sg.Button('Prev'), sg.Button('Next'),sg.Button('Yes'),sg.Button('No'),sg.Button('Load'),sg.InputText(key = '-input_filter-'),sg.Text(key='annotated')]]
             self.window = sg.Window('Study', layout,margins = (10,10),scaling = data.get_config('Study ui_scale'),finalize = True)
             self.init = False
         for i in range(1,5):
@@ -198,7 +205,10 @@ class Study:
                 self.setups_data.at[index,'sub_st'] = sub_st
                 df.at[index,'sub_st'] = sub_st
                 df.to_feather(r"C:\Stocks\local\study\historical_setups.feather")
-            if int(self.i) == self.i: col = 'pre_annotation'
+            if int(self.i) == self.i: 
+                self.annotated += 1
+                self.window['annotated'].update(str(self.annotated))
+                col = 'pre_annotation'
             else: col = 'post_annotation'
             bar = self.setups_data.iloc[math.floor(self.i)]
             self.window["-annotation-"].update(bar[col])

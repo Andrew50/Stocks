@@ -25,7 +25,6 @@ class Screener:
 				else:
 					if 'd' in tf or 'w' in tf: 
 						ticker_list, browser = Screener.get('current',True,browser)
-						#ticker_list = ticker_list[:100]
 						path = 1
 					else: 
 						ticker_list, browser = Screener.get('intraday',True,browser)
@@ -60,6 +59,7 @@ class Screener:
 					Screener.log(ticker,score,dt,tf,path,st,df)
 
 	def log(ticker,z, dt, tf,  path, setup_type,df):
+		dt = data.format_date(dt)
 		if path == 3: print(f'{ticker} {dt} {z} {setup_type}')
 		elif path == 2:
 			mpf.plot(df[-100:], type='candle', mav=(10, 20), volume=True, title=f'{ticker}, {setup_type}, {z}, {tf}', style=mpf.make_mpf_style(marketcolors=mpf.make_marketcolors(up='g',down='r')), savefig = pathlib.Path("C:/Stocks/local/screener")/ 'intraday.png')

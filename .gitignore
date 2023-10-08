@@ -40,6 +40,8 @@ Study.lnk
 Study.bat
 Trainer.lnk
 Trainer.bat
+Screener.bat
+Screener.lnk
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

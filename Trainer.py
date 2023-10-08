@@ -1,5 +1,6 @@
 import pathlib, io, shutil, os, math, random, PIL
 import pandas as pd
+import numpy as np
 import mplfinance as mpf
 import PySimpleGUI as sg
 from Data import Data as data
@@ -51,7 +52,7 @@ class Trainer:
 					return
 				df = pd.read_feather('C:/Stocks/local/data/' + self.event + '.feather')
 				length = len(df[df['value'] == 1])
-				if  length < 100: 
+				if  length < 150: 
 					sg.Popup(f'{self.event} only has {length} yes data points')
 					return
 			self.init = True
@@ -67,7 +68,8 @@ class Trainer:
 				else: 
 					bar = self.chart_info[math.floor(self.i/self.sub_preload_amount)].get()[self.i%self.sub_preload_amount]
 					ident = None
-				data.add_setup(bar[1],bar[0].index[-1],self.current_setup,val,1,ident)
+				try: data.add_setup(bar[1],bar[0].index[-1],self.current_setup,val,1,ident)
+				except Exception as e: sg.popup(e)
 			self.i += 1
 			self.update(self)
 			self.preload(self)
@@ -115,7 +117,51 @@ class Trainer:
 				[sg.Button('Use No'), sg.Button('Skip No')] + [sg.Button(tf) for tf in self.tf_list]]
 			elif self.current_menu == 'Validator':
 				df = pd.read_feather('C:/Stocks/local/data/' + self.current_setup + '.feather').sample(frac = 1)
-				self.setup_df = df[df['value'] == 1]
+				df = df[df['value'] == 1]
+				
+######
+				
+				# num_dfs = int(data.get_config('Data cpu_cores'))
+				# s = math.ceil(len(df) / num_dfs)
+				# dfs = [df[int(s*i):int(s*(i+1))] for i in range(num_dfs)]
+				# values = data.pool(data.create_arrays,dfs)
+				# x = np.concatenate([bar[0] for bar in values])
+				# #y = np.concatenate([bar[1] for bar in values])
+				# info = np.concatenate([bar[2] for bar in values])
+				# dfs = {}
+				# for bar in values: dfs.update(bar[3])
+				model = data.load_model(self.current_setup)
+				# setups = data.score(x,info,dfs,self.current_setup,model,0)
+				
+				# setups.sort(key=lambda x: x[2])
+				
+				# self.setup_df = pd.DataFrame({'ticker':[bar[0] for bar in setups],
+				#   'dt':[bar[1]for bar in setups],
+				#   'score':[bar[2] for bar in setups]})
+				
+				# self.setup_df['source'] = '0'
+				# self.setup_df['sindex'] = 0
+				# for i in range(len(self.setup_df)):
+				# 	self.setup_df[i,3
+				
+
+#####
+				df['tf'] = self.current_setup.split('_')[0]
+				print(len([*set(df['ticker'].to_list())]))
+				
+				x,y,info,dfs = self.pool.apply(data.create_arrays,[df])
+				setups = data.score(x,info,dfs,self.current_setup,model,0)
+				print(len(x))
+				print(len(df))
+				print(len(info))
+				df['score'] = [bar[2] for bar in setups]
+				
+				#for ticker,dt,score,df in setups:
+					#Screener.log(ticker,score,dt,tf,path,st,df)
+
+
+
+
 				layout = [[graph],
 				[sg.Button(s) for s in self.full_setup_list],
 				[sg.Text(self.current_setup), sg.Text(key = '-counter-')]]
@@ -179,7 +225,7 @@ class Trainer:
 					ticker = self.setup_df.iat[i,0]
 					dt = self.setup_df.iat[i,1]
 					df = data.get(ticker,self.current_setup.split('_')[0],dt,250)
-					title = self.current_setup
+					title = f'{self.current_setup} {self.setup_df.iat[i,2]}'
 				self.chart_info.append([df,ticker,title,i])
 			arglist = [self.chart_info[i] for i in index_list if i in list(range(len(self.chart_info)))]
 			self.pool.map_async(Trainer.plot,arglist)
@@ -198,10 +244,11 @@ class Trainer:
 		ii = 0
 		while True:
 			ticker = full_ticker_list[random.randint(0,len(full_ticker_list)-1)]
-			dfs = [data.get(ticker,tf = current_tf)]
-			if dfs[0].empty: continue
-			x,_,info = data.format(dfs,True)
-			setups = data.score(x,info,dfs,st,model,False)
+			x,_,info, dfs = data.create_arrays(pd.DataFrame({'ticker':[ticker],'dt':[None],'tf':[current_tf]}))
+			#dfs ={ticker:data.get(ticker,tf = current_tf)}
+			#if list(dfs.values())[0].empty: continue#zzzzzz theres gotta be a better way to check if the df is empty
+			#x,_,info = data.format(dfs,True)
+			setups = data.score(x,info,dfs,st,model,use_requirements=True)
 			for ticker,_,score,df in setups:
 				index = 300
 				if index >= len(df): index = len(df) - 1
@@ -231,12 +278,12 @@ class Trainer:
 			shutil.copy(r'C:\Stocks\sync\files\blank.png',p)
 						
 	def save_training_data(self):
-		data = self.chart_info[self.i][0]
+		info = self.chart_info[self.i][0]
 		ticker = self.chart_info[self.i][1]
 		ii = 0
 		for s in self.current_setup_list:
 			df = pd.DataFrame()
-			df['dt'] = data.index
+			df['dt'] = info.index
 			df['ticker'] = ticker
 			df['value'] = 0
 			df['required'] = 0
@@ -246,7 +293,7 @@ class Trainer:
 					index = bar[0]
 					df.iat[index,2] = 1
 					if index <= self.trainer_cutoff:
-						add = pd.DataFrame({'ticker':[ticker],'dt':[data.index[index]], 'value':[1], 'required':[0]})
+						add = pd.DataFrame({'ticker':[ticker],'dt':[info.index[index]], 'value':[1], 'required':[0]})
 						df = pd.concat([df,add]).reset_index(drop = True)
 			df = df[self.trainer_cutoff:]
 			if self.event == 'Skip No': df = df[df['value'] == 1]

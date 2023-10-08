@@ -8,7 +8,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Sequential, load_model
 from multiprocessing import Pool, current_process
 from tensorflow.keras.layers import Dense, LSTM, Bidirectional, Dropout
-import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow
+import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
 
 class Data:
@@ -44,14 +44,14 @@ class Data:
 			if 'w' in tf and not Data.is_pre_market(dt): df = pd.concat([df,last_bar])
 			if base_tf == '1d' and Data.is_pre_market(dt): 
 				pm_bar = pd.read_feather('C:/Stocks/sync/files/current_scan.feather').set_index('ticker').loc[ticker]
-				pm_price = pm_bar['pm change'] +  df.iat[-1,3]
+				pm_price = pm_bar['pm change'] + df.iat[-1,3]
 				df = pd.concat([df,pd.DataFrame({'datetime': [dt], 'open': [pm_price],'high': [pm_price], 'low': [pm_price], 'close': [pm_price], 'volume': [pm_bar['pm volume']]}).set_index("datetime",drop = True)])
 			df['ticker'] = ticker
 			return df.dropna()[-bars:]
 		except TimeoutError: return pd.DataFrame()
 
-	def score(x,info,dfs,st,model):
-		threshold = Data.get_config('Screener threshold')
+	def score(x,info,dfs,st,model,threshold = None,use_requirements = True):
+		if threshold == None: threshold = Data.get_config('Screener threshold')
 		setups = []
 		scores = model.predict(x)[:,1]
 		for i in range(len(scores)):
@@ -63,24 +63,67 @@ class Data:
 				#key = bar[2]
 				#df = dfs[key]
 				try: 
+
 					df = dfs[ticker]
-					df = df[:Data.findex(df,dt) + 1]
-				except Exception as e: print(e)
+
+					#try: df = dfs[ticker+str(dt)]
+					#except: df = dfs[ticker+'god']
+					#except: df = dfs[ticker+'god']#
+
+
+					#df = dfs[ticker+str(dt)]
+					#if dt == None: df = dfs[ticker+str(dt)]
+					#else: df = dfs[ticker+str(dt.date())]
+					if df.index[-1] != dt:
+						df = df[:Data.findex(df,dt) + 1]
+				except Exception as e: print(e)##########
 				else: 
-					if Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
+					if threshold == 0 or not use_requirements or Data.get_requirements(ticker,df,st): setups.append([ticker,dt,score,df])
+		random.shuffle(setups)
 		return setups
 
-	def format(dfs, use_whole_df = False):
+	def create_arrays(df):
 
+		pbar = tqdm(total = len(df))
+		dfs = {}
+		#dfs = []
+		k = 0
+		for i in range(len(df)):
+			bar = df.iloc[i]
+			ticker = bar['ticker']
+			tf = bar['tf']
+			dt = bar['dt']
+			try: value = bar['value']
+			except: value = 0
+			data = Data.get(ticker,tf,dt)
+			if not data.empty: 
+				data['value'] = value
+				#data['key'] = df.index[i]
+				#if dt == None: dfs.update({data['ticker'][0] + str('god'):data})
+				#else: dfs.update({data['ticker'][0] + str(dt):data})
+				dfs.update({data['ticker'][0]:data})
+				#else: dfs.update({data['ticker'][0] + str(dt.date()):data})####
+				#dfs.append(data)
+				k += 1
+			pbar.update(1)
+		pbar.close()
+		x, y, info = Data.format(dfs,(dt == None))
+		return x, y, info, dfs
+
+	def format(dfs, use_whole_df = False):
 		def reshape_x(x: np.array,FEAT_LENGTH) -> np.array:
 			num_feats = x.shape[1]//FEAT_LENGTH
 			x_reshaped = np.zeros((x.shape[0], FEAT_LENGTH, num_feats))
 			for n in range(0, num_feats): x_reshaped[:, :, n] = x[:, n*FEAT_LENGTH:(n+1)*FEAT_LENGTH]
 			return x_reshaped
 		lis = list(dfs.values())
+		#try: lis = list(dfs.values())#if it is dict try and extract list
+		#except: lis = dfs# otherwise it is already a list as it is passed from trainer tuner
 		arglist = [[lis[i],use_whole_df] for i in range(len(lis))]
 		#arglist = [[dfs[i],use_whole_df] for i in range(len(dfs))]
-		if current_process().name == 'MainProcess': dfs = Data.pool(Data.worker,arglist)
+		if current_process().name == 'MainProcess': 
+			
+			dfs = Data.pool(Data.worker,arglist)
 		else:
 			dfs = []
 			pbar = tqdm(total = len(arglist))
@@ -112,6 +155,7 @@ class Data:
 
 		def get_lagged_returns(df: pd.DataFrame, sample_size) -> pd.DataFrame:
 			for col in ['open', 'low', 'high', 'close']:
+			#or col in ['open', 'low', 'high', 'close','volume']:
 				return_col = df[col]/df['close'].shift(1)  - 1
 				df = time_series(df, return_col, f'feat_{col}_ret', sample_size)
 			return df
@@ -134,12 +178,19 @@ class Data:
 		dt = df.index
 		df = get_lagged_returns(df, sample_size)
 		for col in ['high','low','close']: df[f'feat_{col}_ret_t-{sample_size - 1}'] = df[f'feat_open_ret_t-{sample_size-1}']
+		#df[f'feat_volume_ret_t-{sample_size - 1}'] = 0################################
 		df = get_classification(df,value, ticker, dt)#, key)
 		return df.replace([np.inf, -np.inf], np.nan).dropna()[[col for col in df.columns if 'feat_' in col] + ['classification'] + ['ticker'] + ['dt']]# + ['key']]
 
 	def train(st, percent_yes, epochs):
-		if len(pd.read_feather('C:/Stocks/local/data/' + st + '.feather')) < 100: return
+		df = pd.read_feather('C:/Stocks/local/data/' + st + '.feather')
+		ones = len(df[df['value'] ==1])
+		if ones < 150: 
+			print(f'{st} cannot be trained with only {ones} positives')
+			return
 		x, y  = Data.sample(st, percent_yes)
+		print(y.shape)
+		return
 		model = Sequential([Bidirectional(LSTM(64, input_shape = (x.shape[1], x.shape[2]), return_sequences = True,),),Dropout(0.2), Bidirectional(LSTM(32)), Dense(3, activation = 'softmax'),])
 		model.compile(loss = 'sparse_categorical_crossentropy', optimizer = Adam(learning_rate = 1e-3), metrics = ['accuracy'])
 		model.fit(x, y, epochs = epochs, batch_size = 64, validation_split = .2,)
@@ -166,15 +217,20 @@ class Data:
 					yes.append(bar)
 		yes = pd.DataFrame(yes)
 		no = pd.DataFrame(no)
+		
+		required =  int(len(yes) - ((len(no)+len(yes)) * use))
+		if required < 0:
+			no = no[:required]
 		while True:
 			no = no.drop_duplicates(subset = ['ticker','dt'])
-			required =  int(len(yes) - (len(no) * use))
+			required =  int(len(yes) - ((len(no)+len(yes)) * use))
 			sample = allsetups[allsetups['value'] == 0].sample(frac = 1)
 			if required < 0 or len(sample) == len(no): break
 			sample = sample[:required + 1]
 			no = pd.concat([no,sample])
 		df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
 		df['tf'] = st.split('_')[0]
+		#rint(f'{st} sample ratio = {round(len(yes)/len(df),4)}')
 		num_dfs = int(Data.get_config('Data cpu_cores'))
 		s = math.ceil(len(df) / num_dfs)
 		dfs = [df[int(s*i):int(s*(i+1))] for i in range(num_dfs)]
@@ -183,27 +239,7 @@ class Data:
 		y = np.concatenate([bar[1] for bar in values])
 		return x, y
 
-	def create_arrays(df):
-		pbar = tqdm(total = len(df))
-		dfs = {}
-		#dfs = []
-		for i in range(len(df)):
-			bar = df.iloc[i]
-			ticker = bar['ticker']
-			tf = bar['tf']
-			dt = bar['dt']
-			try: value = bar['value']
-			except: value = 0
-			data = Data.get(ticker,tf,dt)
-			if not data.empty: 
-				data['value'] = value
-				#data['key'] = df.index[i]
-				dfs.update({data['ticker'][0]:data})
-				#dfs.append(data)
-			pbar.update(1)
-		pbar.close()
-		x, y, info = Data.format(dfs,(dt == None))
-		return x, y, info, dfs
+	
 
 	def get_requirements(ticker, df, st):
 
@@ -244,14 +280,16 @@ class Data:
 		for i in range(len(scan)):
 			for tf in ['d','1min']: batches.append([scan[i],tf])
 		Data.pool(Data.update, batches)
-		if Data.get_config("Data identity") == 'desktop':
+		if Data.get_config("Data identity") == 'laptop':
 			weekday = datetime.datetime.now().weekday()
 			if weekday == 4: Data.backup()
-			elif weekday == 5:
-				Data.consolidate_database()
-				setup_list = Data.get_setups_list()
-				for s in setup_list: Data.train(s,.05,200)
-		else: Data.refill_backtest()
+			elif weekday == 5: Data.retrain_models()
+		Data.refill_backtest()
+
+	def retrain_models():
+		Data.consolidate_database()
+		setup_list = Data.get_setups_list()
+		for s in setup_list: Data.train(s,.05,300)#######
 
 	def update(bar):
 		ticker = bar[0]
@@ -344,7 +382,7 @@ class Data:
 		try: historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
 		except: historical_setups = pd.DataFrame()
 		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"): shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-		while historical_setups.empty or (len(historical_setups[historical_setups["pre_annotation"] == ""]) < 1500):
+		while historical_setups.empty or (len(historical_setups[historical_setups["pre_annotation"] == ""]) < 2500):
 			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather").sample(frac=1)
 			screener.run(ticker = full_list_minus_annotation[:20]['ticker'].tolist(), fpath = 0)
 			full_list_minus_annotation = full_list_minus_annotation[20:].reset_index(drop=True)
@@ -353,10 +391,10 @@ class Data:
 
 	def backup():
 		date = datetime.date.today()
-		src = r'C:/Scan'
-		dst = r'D:/Backups/' + str(date)
+		src = r'C:/Stocks'
+		dst = r'C:/Backups/' + str(date)
 		shutil.copytree(src, dst)
-		path = "D:/Backups/"
+		path = "C:/Backups/"
 		dir_list = os.listdir(path)
 		for b in dir_list:
 			dt = datetime.datetime.strptime(b, '%Y-%m-%d')
@@ -376,7 +414,8 @@ class Data:
 		setups = Data.get_setups_list()
 		for setup in setups:
 			df = pd.DataFrame()
-			for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
+			#for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
+			for ident in ['desktop_','laptop_']:
 				try: 
 					df1 = pd.read_feather(f"C:/Stocks/sync/database/{ident}{setup}.feather").dropna()
 					df1['sindex'] = df1.index
