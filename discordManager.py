@@ -10,6 +10,13 @@ class discordManager():
 		client = discord_bot(intents=intents)
 		client.run('MTE2MDAyNzYzMzY1Mjg3NTMyNQ.GDB8fq.ELueCj6j1lGnYE0iLGIHUD51hzWm_JdyqaNrK0')
 class discord_bot(discord.Client): 
+	
+	def start_query(message, ticker, dt, numBars):
+		returnedScores = match.initiate(ticker, dt, numBars)
+		returnMessage = ""
+		for ticker,index,score in returnedScores:
+			returnMessage = returnMessage + (f'{ticker} {Data(ticker).df.index[index]} \n')
+			message.channel.send(returnMessage)
 	async def on_ready(self):
 		pass
 	async def on_message(self, message):
@@ -18,15 +25,11 @@ class discord_bot(discord.Client):
 		if message.content.startswith('query?'):
 			await message.channel.send('Query Initiated')
 			text = message_content.split('? ')[1].split(' ')
-			print(text)
 			try:
 				ticker = text[0]
 				dt = text[1]
 				numBars = int(text[2])
-				await message.channel.send(f'{ticker} {dt} {numBars}')
-				returnedScores = match.initiate(ticker, dt, numBars)
-				for ticker,index,score in returnedScores:
-					await message.channel.send(f'{ticker} {Data(ticker).df.index[index]}')
+				discord_bot.start_query(message, ticker, dt, numBars)
 			except TimeoutError:
 				await message.channel.send('Incorrect format used.')
 				

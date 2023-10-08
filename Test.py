@@ -433,7 +433,7 @@ class Data:
 				for i in list(range(bars,d.shape[0]+1,partitions)) + [bars]:
 					try:
 						x = d[i-bars:i+1]		
-						x = x.reshape(-1, 1)
+						x = x.reshape((-1, 1))
 						#x = normalize(x)
 						x = np.flip(x,0)
 						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
