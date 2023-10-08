@@ -60,6 +60,7 @@ class SoftDTW(nn.Module):
 
 
 def dtw(x,y):
+    print('-1')
     sequence1 = torch.tensor(x, requires_grad=True).cuda()
     sequence2 = torch.tensor(y, requires_grad=True).cuda()
     print('0')
