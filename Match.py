@@ -37,7 +37,58 @@ import cupy as cp
 # dtw_distance = gpu_dtw(time_series1_gpu, time_series2_gpu)
 
 # print(f"GPU-accelerated DTW Distance: {dtw_distance}")
+import numpy as np
+import cupy as cp
+import numba
+from numba import cuda
 
+@cuda.jit
+def dtw_kernel(query, reference, cost_matrix):
+    i, j = cuda.grid(2)
+    if i < cost_matrix.shape[0] and j < cost_matrix.shape[1]:
+        # Calculate the absolute difference between query[i] and reference[j]
+        diff = cp.abs(query[i] - reference[j])
+        # Compute the local cost (Euclidean distance)
+        local_cost = diff ** 2
+        # Update the cost_matrix with the minimum cost path
+        if i == 0 and j == 0:
+            cost_matrix[i, j] = local_cost
+        elif i == 0:
+            cost_matrix[i, j] = local_cost + cost_matrix[i, j - 1]
+        elif j == 0:
+            cost_matrix[i, j] = local_cost + cost_matrix[i - 1, j]
+        else:
+            cost_matrix[i, j] = local_cost + min(
+                cost_matrix[i - 1, j],
+                cost_matrix[i, j - 1],
+                cost_matrix[i - 1, j - 1]
+            )
+
+def dtw(query, reference):
+    query = cp.array(query)
+    reference = cp.array(reference)
+    n, m = len(query), len(reference)
+    
+    # Initialize the cost matrix with zeros
+    cost_matrix = cp.zeros((n, m), dtype=cp.float32)
+
+    # Define the thread grid and block dimensions
+    threads_per_block = (16, 16)
+    blocks_per_grid_x = (n + threads_per_block[0] - 1) // threads_per_block[0]
+    blocks_per_grid_y = (m + threads_per_block[1] - 1) // threads_per_block[1]
+    blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y)
+
+    # Launch the kernel
+    dtw_kernel[blocks_per_grid, threads_per_block](query, reference, cost_matrix)
+
+    # Return the DTW distance
+    return cp.sqrt(cost_matrix[-1, -1])
+
+# Example usage
+# query_sequence = [1.0, 2.0, 3.0, 4.0]
+# reference_sequence = [2.0, 3.0, 3.0, 4.0]
+# distance = dtw(query_sequence, reference_sequence)
+# print(f"DTW Distance: {distance}")
 			
 class Match:
 	def gpu_dtw(x, y):
