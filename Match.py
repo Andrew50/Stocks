@@ -9,9 +9,10 @@ from Test import Data
 from discordwebhook import Discord
 import numpy as np
 from sklearn import preprocessing
+from sfastdtw import sfastdtw
 import mplfinance as mpf
 import torch
-
+from scipy.spatial.distance import euclidean
 #from soft_dtw_cuda.soft_dtw_cuda import SoftDTW
 
 ## Create the sequences
@@ -30,7 +31,7 @@ import torch
 
 ## Aggregate and call backward()
 #loss.mean().backward()
-from Dtw import dtw as dtw
+#from Dtw import dtw as dtw
 			
 class Match:
 	
@@ -49,7 +50,12 @@ class Match:
 		
 		lis = []
 		for x in df1.np:
-			distance = dtw(x, y)
+			print('x')
+			print(x)
+			print('y')
+			print(y)
+			time.sleep(2)
+			distance = sfastdtw(x,y,1,euclidean)#dtw(x, y)
 			lis.append(distance)
 		setattr(df1,'scores',lis)
 		return df1
@@ -61,7 +67,7 @@ class Match:
 		return dfs
 	
 	def initiate(ticker, dt, bars): 
-		ticker_list = screener.get('full')[:500]
+		ticker_list = screener.get('full')[:2000]
 		dfs = data.pool(Match.fetch,ticker_list)
 		start = datetime.datetime.now()
 		dfs = Match.match(ticker,dt,bars,dfs)
@@ -77,7 +83,7 @@ class Match:
 if __name__ == '__main__':
 	
 	if True:
-		ticker_list = screener.get('full')[:10]
+		ticker_list = screener.get('full')[:2000]
 		dfs = data.pool(Match.fetch,ticker_list)
 		ticker = 'JBL' #input('input ticker: ')
 		dt = '2023-10-03' #input('input date: ')

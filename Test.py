@@ -413,26 +413,27 @@ class Data:
 						x = d[i-bars:i]		
 						x = x.reshape((bars, 1))
 						#x = normalize(x)
-						x = np.flip(x,0)
+						#x = np.flip(x,0)
+						returns.append(x)
 						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
 						#x = np.array(x)
 
-						x = torch.tensor(list(x), requires_grad=True).cuda()
+						#x = torch.tensor(list(x), requires_grad=True).cuda()
 						#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
 
 
 
-					x = x
-
+					except:
+						pass
 					#returns.append(x.detach())
-					returns.append(list(x))
+					#returns.append(list(x))
 					
 				
 		except TimeoutError: 
 			pass
 		
 		#self.np = returns.detach().cpu().numpy()
-		self.np = returns
+		self.np = np.array(returns)
 
 	def findex(self,dt):
 		dt = Main.format_date(dt)
