@@ -20,7 +20,7 @@ import pyts.approximation as sax
 
 
 import numpy as np
-import cupy as cp
+#import cupy as cp
 
 # Define your time series data
 # time_series1 = np.array([1, 2, 3, 4, 5], dtype=np.float32)
@@ -37,7 +37,7 @@ import cupy as cp
 # dtw_distance = gpu_dtw(time_series1_gpu, time_series2_gpu)
 
 # print(f"GPU-accelerated DTW Distance: {dtw_distance}")
-import numpy as np
+'''import numpy as np
 import cupy as cp
 import numba
 from numba import cuda
@@ -88,7 +88,7 @@ def dtw(query, reference):
 # query_sequence = [1.0, 2.0, 3.0, 4.0]
 # reference_sequence = [2.0, 3.0, 3.0, 4.0]
 # distance = dtw(query_sequence, reference_sequence)
-# print(f"DTW Distance: {distance}")
+# print(f"DTW Distance: {distance}")'''
 			
 class Match:
 	def gpu_dtw(x, y):
