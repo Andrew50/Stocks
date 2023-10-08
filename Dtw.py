@@ -29,6 +29,8 @@ class SoftDTW(nn.Module):
         self.gamma = gamma
 
     def forward(self, D):
+        print(D.shape)
+        print(D.shape)
         N, M = D.shape
         D = torch.exp(-D / self.gamma).cuda()  # Move data to GPU
 

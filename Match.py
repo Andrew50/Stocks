@@ -35,9 +35,10 @@ from Dtw import dtw as dtw
 class Match:
 	
 	def fetch(ticker,bars=10,dt = None):
+		
 		tf = 'd'
 		if dt != None:
-			df = Data(ticker,tf,dt,bars = bars)
+			df = Data(ticker,tf,dt,bars = bars+1)
 		else:
 			df = Data(ticker,tf)
 		df.np(bars,True)
@@ -48,13 +49,14 @@ class Match:
 		lis = []
 		#print(f'{df1.np[0].shape} , {y.shape}')
 		for x in df1.np:
+			print(f'{x.shape} , {y.shape}')
 			distance, path = dtw(x, y)
 			lis.append(distance)
 		setattr(df1,'scores',lis)
 		return df1
 	
 	def match(ticker,dt,bars,dfs):
-		y = Match.fetch(ticker,bars,dt).np[00]
+		y = Match.fetch(ticker,bars,dt).np[0]
 		print(y)
 		arglist = [[x,y] for x in dfs]
 		dfs = data.pool(Match.worker,arglist)

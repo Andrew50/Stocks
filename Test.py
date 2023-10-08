@@ -430,9 +430,10 @@ class Data:
 				# 	if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
 				# 	returns = x
 				# else:
-				for i in list(range(bars,d.shape[0]+1,partitions)) + [bars]:
+				for i in list(range(bars,d.shape[0]+1,partitions)):
 					try:
-						x = d[i-bars:i+1]		
+						#print(f'{i-bars:i
+						x = d[i-bars:i]		
 						x = x.reshape((-1, 1))
 						#x = normalize(x)
 						x = np.flip(x,0)
@@ -444,14 +445,15 @@ class Data:
 
 
 
-
+						print(x.shape)
 						x = x.cpu()
+
 						returns.append(x.detach())
 					except:
 						pass
 				
 		except: 
-			return returns
+			pass
 		
 		#self.np = returns.detach().cpu().numpy()
 		self.np = returns
@@ -493,17 +495,6 @@ if __name__=='__main__':
 	
 	df.df = df.df[:100] #do something with a pandas method
 	
- #reassign the df to a new DF object
-	
-	#print(df.findex('2023-04-10'))
-	
-	
-	
-
-# # class CustomDataFrame(pd.DataFrame):
-# # 	def __init__(self, data, name):
-# # 		super().__init__(data)
-# # 		self.name = name
 
 
 
