@@ -444,7 +444,6 @@ class Data:
 
 
 
-						print(x.shape)
 						x = x.cpu()
 
 						returns.append(x.detach())
