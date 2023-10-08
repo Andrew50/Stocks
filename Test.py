@@ -421,7 +421,6 @@ class Data:
 			d = np.zeros((x.shape[0]-1))
 			for i in range(len(d)): #add ohlc
 				d[i] = x[i+1]/x[i] - 1
-				
 			if partitions != 0:
 				# if d.shape[0] == bars-1:
 				# 	x = d.reshape(-1, 1)
@@ -430,16 +429,18 @@ class Data:
 				# 	if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
 				# 	returns = x
 				# else:
-				for i in list(range(bars,d.shape[0]+1,partitions)) + [bars]:
+				for i in list(range(bars,d.shape[0]+1,partitions)):
 					try:
 						x = d[i-bars:i+1]		
+						if(numpy.shape(x) != (10,1)):
+							print(i)
 						x = x.reshape((-1, 1))
 						#x = normalize(x)
 						x = np.flip(x,0)
 						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
-						x = np.array(x)
+						x = np.array(x)				
 						returns.append(x)
-					except:
+					except TimeoutError:
 						pass
 				
 		except: 

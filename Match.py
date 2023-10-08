@@ -11,7 +11,7 @@ import numpy as np
 from sklearn import preprocessing
 import mplfinance as mpf
 import torch
-
+'''
 from soft_dtw_cuda.soft_dtw_cuda import SoftDTW
 
 # Create the sequences
@@ -31,7 +31,7 @@ loss = sdtw(x, y)  # Just like any torch.nn.xyzLoss()
 # Aggregate and call backward()
 loss.mean().backward()
 
-			
+			'''
 class Match:
 	
 	def fetch(ticker,bars=10,dt = None):
@@ -54,7 +54,7 @@ class Match:
 		return df1
 	
 	def match(ticker,dt,bars,dfs):
-		y = Match.fetch(ticker,bars,dt).np[00]
+		y = Match.fetch(ticker,bars,dt).np[0]
 		print(y)
 		arglist = [[x,y] for x in dfs]
 		dfs = data.pool(Match.worker,arglist)
@@ -79,6 +79,7 @@ if __name__ == '__main__':
 	dt = '2023-10-03' #input('input date: ')
 	bars = 10 #int(input('input bars: '))
 	y = Match.fetch(ticker,bars,dt).np
+	print(y)
 	if True:
 		ticker_list = screener.get('full')[:1000]
 		dfs = data.pool(Match.fetch,ticker_list)
