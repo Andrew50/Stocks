@@ -1,119 +1,38 @@
 from locale import normalize
-from Screener import Screener as screener
 from multiprocessing.pool import Pool
 from Data import Data as data
 import numpy as np
 import datetime
 from Screener import Screener as screener
-from scipy.spatial.distance import euclidean, cityblock
-from sfastdtw import sfastdtw
 import time
 from Test import Data
 from discordwebhook import Discord
 import numpy as np
 from sklearn import preprocessing
 import mplfinance as mpf
-#import pyts
-#from pyts.approximation import SymbolicAggregateApproximation
-#from pyts.metrics import dtw
-#import pyts.approximation as sax
+import torch
 
+from soft_dtw_cuda.soft_dtw_cuda import SoftDTW
 
-import numpy as np
-import cupy as cp
+# Create the sequences
+batch_size, len_x, len_y, dims = 8, 15, 12, 5
+x = torch.rand((batch_size, len_x, dims), requires_grad=True)
+y = torch.rand((batch_size, len_y, dims))
+# Transfer tensors to the GPU
+x = x.cuda()
+y = y.cuda()
 
-# Define your time series data
-# time_series1 = np.array([1, 2, 3, 4, 5], dtype=np.float32)
-# time_series2 = np.array([2, 3, 4, 5, 6], dtype=np.float32)
+# Create the "criterion" object
+sdtw = SoftDTW(use_cuda=True, gamma=0.1)
 
-# # Transfer data to GPU
-# time_series1_gpu = cp.array(time_series1)
-# time_series2_gpu = cp.array(time_series2)
+# Compute the loss value
+loss = sdtw(x, y)  # Just like any torch.nn.xyzLoss()
 
-# Function to compute DTW using CuPy on GPU
+# Aggregate and call backward()
+loss.mean().backward()
 
-
-# Calculate DTW using GPU
-# dtw_distance = gpu_dtw(time_series1_gpu, time_series2_gpu)
-
-# print(f"GPU-accelerated DTW Distance: {dtw_distance}")
-import numpy as np
-import cupy as cp
-import numba
-from numba import cuda
-
-@cuda.jit
-def dtw_kernel(query, reference, cost_matrix):
-    i, j = cuda.grid(2)
-    if i < cost_matrix.shape[0] and j < cost_matrix.shape[1]:
-        # Calculate the absolute difference between query[i] and reference[j]
-        diff = cp.abs(query[i] - reference[j])
-        # Compute the local cost (Euclidean distance)
-        local_cost = diff ** 2
-        # Update the cost_matrix with the minimum cost path
-        if i == 0 and j == 0:
-            cost_matrix[i, j] = local_cost
-        elif i == 0:
-            cost_matrix[i, j] = local_cost + cost_matrix[i, j - 1]
-        elif j == 0:
-            cost_matrix[i, j] = local_cost + cost_matrix[i - 1, j]
-        else:
-            cost_matrix[i, j] = local_cost + min(
-                cost_matrix[i - 1, j],
-                cost_matrix[i, j - 1],
-                cost_matrix[i - 1, j - 1]
-            )
-
-def dtw(query, reference):
-    query = cp.array(query)
-    reference = cp.array(reference)
-    n, m = len(query), len(reference)
-    
-    # Initialize the cost matrix with zeros
-    cost_matrix = cp.zeros((n, m), dtype=cp.float32)
-
-    # Define the thread grid and block dimensions
-    threads_per_block = (16, 16)
-    blocks_per_grid_x = (n + threads_per_block[0] - 1) // threads_per_block[0]
-    blocks_per_grid_y = (m + threads_per_block[1] - 1) // threads_per_block[1]
-    blocks_per_grid = (blocks_per_grid_x, blocks_per_grid_y)
-
-    # Launch the kernel
-    dtw_kernel[blocks_per_grid, threads_per_block](query, reference, cost_matrix)
-
-    # Return the DTW distance
-    return cp.sqrt(cost_matrix[-1, -1])
-
-# Example usage
-# query_sequence = [1.0, 2.0, 3.0, 4.0]
-# reference_sequence = [2.0, 3.0, 3.0, 4.0]
-# distance = dtw(query_sequence, reference_sequence)
-# print(f"DTW Distance: {distance}")
 			
 class Match:
-	def gpu_dtw(x, y):
-    # Calculate pairwise distances between elements of x and y on the GPU
-		distance_matrix = cp.abs(x[:, None] - y[None, :])
-    
-		# Initialize the accumulated cost matrix
-		accumulated_cost = cp.empty_like(distance_matrix)
-    
-		# Initialize the first row and column of the accumulated cost matrix
-		accumulated_cost[0, 0] = distance_matrix[0, 0]
-    
-		for i in range(1, x.shape[0]):
-			accumulated_cost[i, 0] = distance_matrix[i, 0] + accumulated_cost[i-1, 0]
-    
-		for j in range(1, y.shape[0]):
-			accumulated_cost[0, j] = distance_matrix[0, j] + accumulated_cost[0, j-1]
-    
-		# Calculate the accumulated cost matrix on the GPU
-		for i in range(1, x.shape[0]):
-			for j in range(1, y.shape[0]):
-				accumulated_cost[i, j] = distance_matrix[i, j] + cp.min([accumulated_cost[i-1, j], accumulated_cost[i, j-1], accumulated_cost[i-1, j-1]])
-    
-		# Return the DTW distance
-		return accumulated_cost[-1, -1]
 	
 	def fetch(ticker,bars=10,dt = None):
 		tf = 'd'
@@ -129,7 +48,8 @@ class Match:
 		lis = []
 		#print(f'{df1.np[0].shape} , {y.shape}')
 		for x in df1.np:
-			lis.append(Match.gpu_dtw(x,y))
+			distance, path = dtw(x, y)
+			lis.append(distance)
 		setattr(df1,'scores',lis)
 		return df1
 	
