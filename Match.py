@@ -111,7 +111,7 @@ class Match:
 if __name__ == '__main__':
 	
 	if True:
-		ticker_list = screener.get('full')[:2000]
+		ticker_list = screener.get('full')[:100]
 		dfs = data.pool(Match.fetch,ticker_list)
 		ticker = 'JBL' #input('input ticker: ')
 		dt = '2023-10-03' #input('input date: ')

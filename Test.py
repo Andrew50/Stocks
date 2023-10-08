@@ -433,9 +433,9 @@ class Data:
 				
 		except IndexError: 
 			pass
-		
+		 
 		#self.np = returns.detach().cpu().numpy()
-		self.np = np.array(returns)
+		self.np = cp.asarray(returns)
 
 	def findex(self,dt):
 		dt = Main.format_date(dt)
