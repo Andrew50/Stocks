@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'MatchProgram'
 ]
 
 MIDDLEWARE = [
@@ -55,7 +56,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
-        'APP_DIRS': True,
+        'C:/Stocks/Stocks/MatchProgram/templates': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
