@@ -50,11 +50,6 @@ class Match:
 		
 		lis = []
 		for x in df1.np:
-			print('x')
-			print(x)
-			print('y')
-			print(y)
-			time.sleep(2)
 			distance = sfastdtw(x,y,1,euclidean)#dtw(x, y)
 			lis.append(distance)
 		setattr(df1,'scores',lis)
@@ -83,7 +78,7 @@ class Match:
 if __name__ == '__main__':
 	
 	if True:
-		ticker_list = screener.get('full')[:2000]
+		ticker_list = screener.get('full')[:500]
 		dfs = data.pool(Match.fetch,ticker_list)
 		ticker = 'JBL' #input('input ticker: ')
 		dt = '2023-10-03' #input('input date: ')
@@ -97,7 +92,8 @@ if __name__ == '__main__':
 		scores.sort(key=lambda x: x[2])
 		print(f'completed in {datetime.datetime.now() - start}')
 		for ticker,index,score in scores[:20]:
-			print(f'{ticker} {Data(ticker).df.index[index]}')
+			
+			print(f'{ticker} {Data(ticker).df.index[index]} {score}')
 		
 
 						#lis.append(pyts.metrics.dtw(x,y))
