@@ -19,6 +19,7 @@ import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time
 warnings.filterwarnings("ignore")
 import numpy
 import torch
+import cupy as cp
 
 # import numpy as np
 # from sklearn import preprocessing
@@ -36,6 +37,11 @@ from sklearn.preprocessing import normalize
 
 
 class Main:
+
+	def pool(deff,arg):
+		pool = Pool(processes = int(Data.get_config('Data cpu_cores')))
+		data = list(tqdm(pool.imap_unordered(deff, arg), total=len(arg)))
+		return data
 	
 	def sample(st,use):
 		Main.consolidate_database()
@@ -349,22 +355,27 @@ class Data:
 		self.offset = offset
 		self.scores = []
 		try:
+
+
+
 			if len(tf) == 1: tf = '1' + tf
 			dt = Main.format_date(dt)
 			if 'd' in tf or 'w' in tf: base_tf = '1d'
 			else: base_tf = '1min'
 			try: df = feather.read_feather(Main.data_path(ticker,tf)).set_index('datetime',drop = True)
 			except FileNotFoundError: df = pd.DataFrame()
-			if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Main.is_pre_market(dt)): 
-				try: 
-					add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Main.is_pre_market(dt))
-					add.iloc[0]
-				except: pass
-				else:
-					add.drop('symbol', axis = 1, inplace = True)
-					add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
-					if df.empty or add.index[0] > df.index[-1]: df = add
-					else: df = pd.concat([df,add[Main.findex(add,df.index[-1]) + 1:]])
+
+
+			#if (df.empty or (dt != None and (dt < df.index[0] or dt > df.index[-1]))) and not (base_tf == '1d' and Main.is_pre_market(dt)): 
+		#		try: 
+	#				add = TvDatafeed(username="cs.benliu@gmail.com",password="tltShort!1").get_hist(ticker,pd.read_feather('C:/Stocks/sync/files/full_scan.feather').set_index('ticker').loc[ticker]['exchange'], interval=base_tf, n_bars=100000, extended_session = Main.is_pre_market(dt))
+		#			add.iloc[0]
+			#	except: pass
+			#	else:
+			#		add.drop('symbol', axis = 1, inplace = True)
+			#		add.index = add.index + pd.Timedelta(hours=(13-(time.timezone/3600)))
+			#		if df.empty or add.index[0] > df.index[-1]: df = add
+				#	else: df = pd.concat([df,add[Main.findex(add,df.index[-1]) + 1:]])
 			if df.empty: raise TimeoutError
 			if dt != None and not Main.is_pre_market(dt):
 				try: df = df[:Data.findex(df,dt) + 1 + int(offset*(pd.Timedelta(tf) / pd.Timedelta(base_tf)))]
@@ -408,32 +419,35 @@ class Data:
 				# 	returns = x
 				# else:
 				for i in list(range(bars,d.shape[0]+1,partitions)):
-					try:
-						#print(f'{i-bars:i
-						x = d[i-bars:i]		
-						x = x.reshape((bars, 1))
-						#x = normalize(x)
-						#x = np.flip(x,0)
-						returns.append(x)
-						#if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
-						#x = np.array(x)
+					#print(f'{i-bars:i
+					x = d[i-bars:i]	
+					x =list(x)
+					x.reverse()
+					#x = cp.asarray(x)
+					#print(x)
+					#x = x.reshape((bars, 1))
+					#x = normalize(x)
+					#x = np.flip(x,0)
+					x = np.array(x)
+					if only_close: x = np.column_stack((x, numpy.arange(  x.shape[0])))
+					#x = np.array(x)
+					#x = np.array(x)
+					#x = x.reshape(1, 2, bars)
+					#x = torch.tensor(list(x), requires_grad=True).cuda()
+					#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
 
-						#x = torch.tensor(list(x), requires_grad=True).cuda()
-						#sequence2 = torch.tensor([1.0, 2.0, 2.5, 3.5], requires_grad=True).cuda()
 
 
-
-					except:
-						pass
 					#returns.append(x.detach())
-					#returns.append(list(x))
+				
+					returns.append([x,i])
 					
 				
-		except TimeoutError: 
+		except IndexError: 
 			pass
-		
+		 
 		#self.np = returns.detach().cpu().numpy()
-		self.np = np.array(returns)
+		self.np = returns
 
 	def findex(self,dt):
 		dt = Main.format_date(dt)

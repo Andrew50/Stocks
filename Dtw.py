@@ -60,20 +60,15 @@ class SoftDTW(nn.Module):
 
 
 def dtw(x,y):
-    print('-1')
     sequence1 = torch.tensor(x, requires_grad=True).cuda()
     sequence2 = torch.tensor(y, requires_grad=True).cuda()
-    print('0')
     # Compute the pairwise distance matrix on the GPU
-    print('1')
     pairwise_distance = torch.abs(sequence1.unsqueeze(1) - sequence2.unsqueeze(0)).cuda()
 
     # Create the Soft DTW model on the GPU
     soft_dtw = SoftDTW(gamma=1.0)
-    print('2')
     # Calculate the Soft DTW distance and gradients on the GPU
     cost, grad = soft_dtw(pairwise_distance)
-    print('3')
 
     # Compute gradients with respect to input sequences
    # sequence1_grad = torch.autograd.grad(cost, sequence1, retain_graph=True)[0]

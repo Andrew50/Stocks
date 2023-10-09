@@ -321,6 +321,7 @@ class SoftDTW(torch.nn.Module):
         """
         Calculates the Euclidean distance between each element in x and y per timestep
         """
+        #print(x)##fix
         n = x.size(1)
         m = y.size(1)
         d = x.size(2)
