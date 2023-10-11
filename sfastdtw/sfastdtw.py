@@ -3,7 +3,7 @@
 
 from __future__ import absolute_import, division
 import numbers
-import cupy as cp
+#import cupy as cp
 import numpy as np
 from collections import defaultdict
 

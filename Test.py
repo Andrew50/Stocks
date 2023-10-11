@@ -18,8 +18,8 @@ from multiprocessing import Pool, current_process
 import websocket, datetime, os, pyarrow, shutil,statistics, warnings, math, time, pytz, tensorflow, random
 warnings.filterwarnings("ignore")
 import numpy
-import torch
-import cupy as cp
+#import torch
+#import cupy as cp
 
 # import numpy as np
 # from sklearn import preprocessing

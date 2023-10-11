@@ -34,7 +34,7 @@ from sfastdtw import sfastdtw
 ## Aggregate and call backward()
 #loss.mean().backward()
 from Dtw import dtw as dtw
-import cupy as cp
+#import cupy as cp
 cp.cuda.Device(0).use()
 			
 class Match:
