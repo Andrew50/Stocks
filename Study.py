@@ -68,6 +68,7 @@ class Study:
             if self.current: 
                 try: df = pd.read_feather(r"C:\Stocks\local\study\current_setups.feather").sort_values(by=['z'], ascending=False)
                 except: raise Exception('No current setups found')
+                print(df.to_string())
             else:
                 df = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
                 sort_by = None
@@ -123,7 +124,7 @@ class Study:
             intraday == True
             if tf == '1min': tf_list = ['d','h','5min','1min']
             else: tf_list = ['d','h',tf,'1min']
-        plt.rcParams.update({'font.size': 30})
+        plt.rcParams.update({'font.size': 10})
         ii = len(tf_list)
         first_minute_high = 1
         first_minute_low = 1
@@ -217,4 +218,4 @@ class Study:
         self.window.maximize()
 
 if __name__ == "__main__":
-    Study.run(Study,False)
+    Study.run(Study,True)

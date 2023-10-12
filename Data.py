@@ -231,7 +231,16 @@ class Data:
 		df = pd.concat([yes,no]).sample(frac = 1).reset_index(drop = True)
 		df['tf'] = st.split('_')[0]
 		#rint(f'{st} sample ratio = {round(len(yes)/len(df),4)}')
+
+
+		main.
+
+
+
 		num_dfs = int(Data.get_config('Data cpu_cores'))
+
+
+
 		s = math.ceil(len(df) / num_dfs)
 		dfs = [df[int(s*i):int(s*(i+1))] for i in range(num_dfs)]
 		values = Data.pool(Data.create_arrays,dfs)
@@ -371,73 +380,7 @@ class Data:
 		print(f'{st} model loaded in {datetime.datetime.now() - start}')
 		return model
 
-	def check_directories():
-		dirs = ['C:/Stocks/local','C:/Stocks/local/data','C:/Stocks/local/account','C:/Stocks/local/study','C:/Stocks/local/trainer','C:/Stocks/local/data/1min','C:/Stocks/local/data/d']
-		if not os.path.exists(dirs[0]): 
-			for d in dirs: os.mkdir(d)
-		if not os.path.exists("C:/Stocks/config.txt"): shutil.copyfile('C:/Stocks/sync/files/default_config.txt','C:/Stocks/config.txt')
-
-	def refill_backtest():
-		from Screener import Screener as screener
-		try: historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
-		except: historical_setups = pd.DataFrame()
-		if not os.path.exists("C:\Stocks\local\study\full_list_minus_annotated.feather"): shutil.copy(r"C:\Stocks\sync\files\full_scan.feather", r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-		while historical_setups.empty or (len(historical_setups[historical_setups["pre_annotation"] == ""]) < 2500):
-			full_list_minus_annotation = pd.read_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather").sample(frac=1)
-			screener.run(ticker = full_list_minus_annotation[:20]['ticker'].tolist(), fpath = 0)
-			full_list_minus_annotation = full_list_minus_annotation[20:].reset_index(drop=True)
-			full_list_minus_annotation.to_feather(r"C:\Stocks\local\study\full_list_minus_annotated.feather")
-			historical_setups = pd.read_feather(r"C:\Stocks\local\study\historical_setups.feather")
-
-	def backup():
-		date = datetime.date.today()
-		src = r'C:/Stocks'
-		dst = r'C:/Backups/' + str(date)
-		shutil.copytree(src, dst)
-		path = "C:/Backups/"
-		dir_list = os.listdir(path)
-		for b in dir_list:
-			dt = datetime.datetime.strptime(b, '%Y-%m-%d')
-			if (datetime.datetime.now() - dt).days > 30: shutil.rmtree((path + b))
-
-	def add_setup(ticker,date,setup,val,req,ident = None):
-		date = Data.format_date(date)
-		add = pd.DataFrame({ 'ticker':[ticker], 'dt':[date], 'value':[val], 'required':[req] })
-		if ident == None: ident = Data.get_config('Data identity') + '_'
-		path = 'C:/Stocks/sync/database/' + ident + setup + '.feather'
-		try: df = pd.read_feather(path)
-		except FileNotFoundError: df = pd.DataFrame()
-		df = pd.concat([df,add]).drop_duplicates(subset = ['ticker','dt'],keep = 'last').reset_index(drop = True)
-		df.to_feather(path)
-
-	def consolidate_database(): 
-		setups = Data.get_setups_list()
-		for setup in setups:
-			df = pd.DataFrame()
-			#for ident in ['ben_','desktop_','laptop_', 'ben_laptop_']:
-			for ident in ['desktop_','laptop_']:
-				try: 
-					df1 = pd.read_feather(f"C:/Stocks/sync/database/{ident}{setup}.feather").dropna()
-					df1['sindex'] = df1.index
-					df1['source'] = ident
-					df = pd.concat([df,df1]).reset_index(drop = True)
-				except FileNotFoundError: pass
-			df.to_feather(f"C:/Stocks/local/data/{setup}.feather")
-
-	def get_setups_list():
-		setups = []
-		path = "C:/Stocks/sync/database/"
-		dir_list = os.listdir(path)
-		for p in dir_list:
-			s = p.split('_')
-			s = s[1] + '_' + s[2].split('.')[0]
-			use = True
-			for h in setups:
-				if s == h:
-					use = False
-					break
-			if use: setups.append(s)
-		return setups
+	
 	
 	def format_date(dt):
 		if dt == 'current': return datetime.datetime.now(pytz.timezone('EST'))
